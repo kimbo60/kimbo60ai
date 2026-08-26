@@ -27,8 +27,11 @@ def load_data():
         df = df.fillna('')
         return df
     except Exception as e:
+        # ✨ 이 부분이 추가되었습니다: 실제 에러 원인을 화면에 빨간 글씨로 출력합니다.
+        st.error(f"🚨 엑셀 파일을 읽는 중 문제가 발생했습니다. 원인: {e}")
+        
         # 엑셀 파일이 같은 폴더에 없을 경우를 대비한 가상 데이터
-        st.warning("⚠️ '농약목록-전체-prg.xlsx' 파일을 찾을 수 없어 임시 데이터를 띄웁니다.")
+        st.warning("⚠️ 임시 데이터를 띄웁니다.")
         return pd.DataFrame({
             "종류": ["살균제", "살균제", "살충제", "살충제"],
             "상품명": ["가스란", "다이센엠-45", "코니도", "팬텀"],
@@ -41,7 +44,6 @@ def load_data():
         })
 
 df_database = load_data()
-
 # 리스트 '추가 보기'를 위한 세션 상태 초기화
 if 'list_count' not in st.session_state:
     st.session_state.list_count = 5
