@@ -8,7 +8,7 @@ import os
 st.set_page_config(page_title="내가 찾는 농약", page_icon="🍊", layout="wide")
 
 # ==========================================
-# 🎨 UI 디자인 6.0 (메뉴 버튼 소형화 및 파스텔 톤 적용)
+# 🎨 UI 디자인 7.0 (한 화면에 쏙 들어오는 슬림 & 컴팩트 모드)
 # ==========================================
 st.markdown("""
     <style>
@@ -16,99 +16,103 @@ st.markdown("""
     .stApp { background-color: #fcf9f2; }
 
     /* ====================================================
-       💻 PC 화면 기본 디자인
+       💻 PC 화면 기본 디자인 (불필요한 여백 제거 및 슬림화)
        ==================================================== */
     .hallabong-title {
         background: linear-gradient(135deg, #ff9800 0%, #e65100 100%);
-        padding: 30px;
-        border-radius: 25px;
+        padding: 15px; /* 타이틀 여백 대폭 축소 */
+        border-radius: 20px;
         text-align: center;
         color: white;
         font-weight: 900;
-        font-size: 3.5rem;
-        box-shadow: 0px 10px 20px rgba(230, 81, 0, 0.4);
-        margin-bottom: 30px;
-        border: 4px solid #ffcc80;
-        text-shadow: 3px 3px 6px rgba(0,0,0,0.4);
+        font-size: 2.8rem; /* 타이틀 글씨 크기 축소 */
+        box-shadow: 0px 6px 15px rgba(230, 81, 0, 0.3);
+        margin-bottom: 20px; /* 타이틀 아래 여백 축소 */
+        border: 3px solid #ffcc80;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
     }
     
     /* 🌟 메인 메뉴 가로 간격 및 정렬 (한 줄에 쏙 들어가도록 수정) */
     div[data-testid="stRadio"] div[role="radiogroup"] {
-        display: flex; flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 12px;
+        display: flex; flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 8px; margin-bottom: 15px;
     }
     div[data-testid="stRadio"] div[role="radiogroup"] div[data-baseweb="radio"] div { display: none !important; }
     
-    /* 🌟 3D 버튼 - 연한 파스텔 톤으로 수정 & 크기 축소 */
+    /* 🌟 3D 버튼 - 컴팩트 사이즈 및 파스텔 톤 */
     div[data-testid="stRadio"] div[role="radiogroup"] label {
-        background: linear-gradient(145deg, #e8f5e9, #c8e6c9) !important; /* 연한 파스텔 그린 */
+        background: linear-gradient(145deg, #e8f5e9, #c8e6c9) !important; 
         border: 2px solid #a5d6a7 !important;
-        padding: 10px 18px !important; /* 버튼 여백 축소 */
-        border-radius: 15px !important;
-        box-shadow: 0px 6px 0px #81c784, 0px 8px 10px rgba(0,0,0,0.1) !important;
+        padding: 8px 16px !important; /* 버튼 여백 대폭 축소 */
+        border-radius: 12px !important;
+        box-shadow: 0px 4px 0px #81c784, 0px 6px 8px rgba(0,0,0,0.1) !important;
         cursor: pointer; transition: all 0.1s ease-in-out; margin: 0 !important;
     }
-    /* 버튼 글씨 크기 축소 및 어두운 색으로 변경 */
+    /* 버튼 글씨 크기 17px로 조절하여 한 줄 배치 최적화 */
     div[data-testid="stRadio"] div[role="radiogroup"] label p {
-        font-size: 20px !important; /* 글자 크기 1단계 축소 */
+        font-size: 17px !important; 
         font-weight: 800 !important; 
-        color: #1b5e20 !important; /* 파스텔톤에 어울리는 진녹색 글씨 */
+        color: #1b5e20 !important; 
         margin: 0 !important; 
-        text-shadow: none !important; /* 파스텔톤을 위해 그림자 제거 */
     }
     /* 버튼 누를 때 액션 */
     div[data-testid="stRadio"] div[role="radiogroup"] label:active,
     div[data-testid="stRadio"] div[role="radiogroup"] label:focus-within {
-        transform: translateY(4px) !important; 
-        box-shadow: 0px 2px 0px #81c784, 0px 4px 6px rgba(0,0,0,0.1) !important;
+        transform: translateY(3px) !important; 
+        box-shadow: 0px 1px 0px #81c784, 0px 3px 4px rgba(0,0,0,0.1) !important;
         background: linear-gradient(145deg, #c8e6c9, #a5d6a7) !important;
     }
 
+    /* 입력 폼 라벨(제목) 여백 및 크기 조절 */
     div[data-testid="stForm"] label p, div[data-testid="stSelectbox"] label p, div[data-testid="stMultiSelect"] label p, div[data-testid="stTextInput"] label p, div[data-testid="stDateInput"] label p {
-        font-size: 26px !important; font-weight: 800 !important; color: #333333; margin-bottom: 10px;
+        font-size: 18px !important; font-weight: 800 !important; color: #333333; margin-bottom: 5px;
     }
     
+    /* 입력창 내부 텍스트 크기 및 여백 컴팩트화 */
     input[type="text"], div[data-baseweb="select"] span, div[data-baseweb="select"] input, div[data-testid="stDateInput"] input {
-        font-size: 24px !important; padding: 10px !important;
+        font-size: 16px !important; padding: 6px 10px !important;
     }
 
+    /* 폼 전체 여백 줄이기 */
     div[data-testid="stForm"] {
-        border: 4px solid #ffb74d; border-radius: 25px; padding: 40px; background-color: #ffffff; box-shadow: 0px 10px 30px rgba(255,183,77,0.2);
+        border: 3px solid #ffb74d; border-radius: 15px; padding: 25px; background-color: #ffffff; box-shadow: 0px 6px 15px rgba(255,183,77,0.15); margin-bottom: 15px;
     }
 
+    /* 제출 버튼 슬림화 */
     button[kind="secondaryFormSubmit"] {
-        background: linear-gradient(to right, #4caf50, #2e7d32) !important; color: white !important; font-size: 30px !important; font-weight: 900 !important;
-        border-radius: 20px !important; padding: 20px 40px !important; border: none !important; box-shadow: 0px 8px 0px #1b5e20, 0px 10px 15px rgba(0,0,0,0.3) !important;
-        transition: all 0.1s; margin-top: 30px; width: 100%; 
+        background: linear-gradient(to right, #4caf50, #2e7d32) !important; color: white !important; font-size: 20px !important; font-weight: 800 !important;
+        border-radius: 12px !important; padding: 12px 20px !important; border: none !important; box-shadow: 0px 6px 0px #1b5e20, 0px 8px 10px rgba(0,0,0,0.2) !important;
+        transition: all 0.1s; margin-top: 15px; width: 100%; 
     }
     button[kind="secondaryFormSubmit"]:active {
-        box-shadow: 0px 3px 0px #1b5e20, 0px 5px 8px rgba(0,0,0,0.3) !important; transform: translateY(5px) !important;
+        box-shadow: 0px 2px 0px #1b5e20, 0px 4px 5px rgba(0,0,0,0.2) !important; transform: translateY(4px) !important;
     }
 
+    /* 우측 날씨 카드 컴팩트화 */
     .weather-card {
-        background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%); padding: 35px; border-radius: 25px; text-align: center;
-        color: #3e2723; font-size: 1.6rem; font-weight: 900; box-shadow: 0px 10px 25px rgba(0,0,0,0.15); margin-bottom: 30px; border: 4px solid #ffcc80;
+        background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%); padding: 20px; border-radius: 15px; text-align: center;
+        color: #3e2723; font-size: 1.3rem; font-weight: 900; box-shadow: 0px 6px 15px rgba(0,0,0,0.1); margin-bottom: 15px; border: 3px solid #ffcc80;
     }
 
     /* ====================================================
        📱 스마트폰 화면 전용 디자인 (반응형 모드)
        ==================================================== */
     @media (max-width: 768px) {
-        .hallabong-title { font-size: 2.2rem !important; padding: 20px !important; border-radius: 15px !important; }
-        .hallabong-title img { width: 50px !important; margin-right: 10px !important; }
+        .hallabong-title { font-size: 2rem !important; padding: 15px !important; border-radius: 12px !important; margin-bottom: 15px !important;}
+        .hallabong-title img { width: 45px !important; margin-right: 8px !important; }
         
-        div[data-testid="stRadio"] div[role="radiogroup"] { gap: 8px !important; }
-        div[data-testid="stRadio"] div[role="radiogroup"] label { padding: 8px 12px !important; border-radius: 10px !important; border-width: 2px !important; }
-        div[data-testid="stRadio"] div[role="radiogroup"] label p { font-size: 15px !important; }
+        div[data-testid="stRadio"] div[role="radiogroup"] { gap: 6px !important; }
+        div[data-testid="stRadio"] div[role="radiogroup"] label { padding: 6px 10px !important; border-radius: 8px !important; border-width: 1px !important; }
+        div[data-testid="stRadio"] div[role="radiogroup"] label p { font-size: 14px !important; }
         
-        div[data-testid="stForm"] { padding: 20px !important; border-radius: 15px !important; border-width: 2px !important; }
-        div[data-testid="stForm"] label p, div[data-testid="stSelectbox"] label p, div[data-testid="stMultiSelect"] label p, div[data-testid="stTextInput"] label p, div[data-testid="stDateInput"] label p { font-size: 18px !important; }
+        div[data-testid="stForm"] { padding: 15px !important; border-radius: 10px !important; border-width: 2px !important; }
+        div[data-testid="stForm"] label p, div[data-testid="stSelectbox"] label p, div[data-testid="stMultiSelect"] label p, div[data-testid="stTextInput"] label p, div[data-testid="stDateInput"] label p { font-size: 16px !important; }
         
-        input[type="text"], div[data-baseweb="select"] span, div[data-baseweb="select"] input, div[data-testid="stDateInput"] input { font-size: 16px !important; padding: 5px !important; }
+        input[type="text"], div[data-baseweb="select"] span, div[data-baseweb="select"] input, div[data-testid="stDateInput"] input { font-size: 14px !important; padding: 5px !important; }
         
-        button[kind="secondaryFormSubmit"] { font-size: 20px !important; padding: 15px !important; border-radius: 12px !important; box-shadow: 0px 5px 0px #1b5e20, 0px 6px 10px rgba(0,0,0,0.3) !important; margin-top: 15px !important; }
-        button[kind="secondaryFormSubmit"]:active { box-shadow: 0px 2px 0px #1b5e20, 0px 3px 5px rgba(0,0,0,0.3) !important; transform: translateY(3px) !important; }
+        button[kind="secondaryFormSubmit"] { font-size: 18px !important; padding: 10px !important; border-radius: 10px !important; box-shadow: 0px 4px 0px #1b5e20, 0px 5px 8px rgba(0,0,0,0.3) !important; margin-top: 10px !important; }
+        button[kind="secondaryFormSubmit"]:active { box-shadow: 0px 1px 0px #1b5e20, 0px 2px 4px rgba(0,0,0,0.3) !important; transform: translateY(3px) !important; }
         
-        .weather-card { font-size: 1.2rem !important; padding: 20px !important; border-radius: 15px !important; border-width: 2px !important; }
+        .weather-card { font-size: 1.1rem !important; padding: 15px !important; border-radius: 12px !important; border-width: 2px !important; }
     }
     </style>
 """, unsafe_allow_html=True)
@@ -116,7 +120,7 @@ st.markdown("""
 # 🍊 메인 타이틀
 st.markdown("""
     <div class='hallabong-title'>
-        <img src="https://cdn3d.iconscout.com/3d/premium/thumb/orange-4623192-3837943.png" width="90" style="vertical-align: middle; margin-right: 20px; drop-shadow: 3px 3px 6px rgba(0,0,0,0.5);">
+        <img src="https://cdn3d.iconscout.com/3d/premium/thumb/orange-4623192-3837943.png" width="70" style="vertical-align: middle; margin-right: 15px; drop-shadow: 3px 3px 6px rgba(0,0,0,0.5);">
         내가 찾는 농약
     </div>
 """, unsafe_allow_html=True)
@@ -167,7 +171,7 @@ if 'list_count' not in st.session_state:
 # ==========================================
 
 if menu == "내가 필요한 농약 찾기":
-    col_main, col_img = st.columns([2.5, 1])
+    col_main, col_img = st.columns([7, 3])
     
     with col_main:
         with st.form("search_form"):
@@ -180,14 +184,13 @@ if menu == "내가 필요한 농약 찾기":
                 desired_pesticide = st.multiselect("희망 약제명 (클릭하거나 검색)", options=pesticide_list, placeholder="약제명 검색 또는 선택")
                 target_pest = st.multiselect("방제 대상 병해충 (클릭하거나 검색)", options=pest_list, placeholder="병해충명 검색 또는 선택")
                 
-                st.markdown("<p style='font-size: 20px; font-weight: 800; color: #333333; margin-bottom: 5px; margin-top: 15px;'>총 살포량</p>", unsafe_allow_html=True)
+                st.markdown("<p style='font-size: 18px; font-weight: 800; color: #333333; margin-bottom: 5px; margin-top: 15px;'>총 살포량</p>", unsafe_allow_html=True)
                 col_vol1, col_vol2 = st.columns([3, 1])
                 with col_vol1:
                     total_volume = st.text_input("살포량 입력", placeholder="예: 1000", label_visibility="collapsed")
                 with col_vol2:
                     volume_unit = st.selectbox("단위", ["L", "말"], index=0, label_visibility="collapsed")
             
-            st.markdown("<br>", unsafe_allow_html=True)
             submitted = st.form_submit_button("🔎 조건에 맞는 농약 찾기")
 
         if submitted:
@@ -225,10 +228,12 @@ if menu == "내가 필요한 농약 찾기":
             center_cols = [col for col in display_df.columns if col not in ['적용병해충', '계통', '금액 (원)']]
             left_cols = [col for col in display_df.columns if col in ['적용병해충', '계통']]
             
+            # 🌟 표 글자 크기 15px로 축소 및 내부 여백(Padding) 타이트하게 조절하여 컴팩트화
             styled_df = display_df.style.set_properties(**{
-                'font-size': '18px',
+                'font-size': '15px',
                 'font-weight': '600',
-                'padding': '12px'
+                'padding': '8px 10px',
+                'line-height': '1.3'
             })
             
             styled_df = styled_df.set_properties(subset=center_cols, **{'text-align': 'center'})
@@ -258,7 +263,7 @@ if menu == "내가 필요한 농약 찾기":
         elif os.path.exists("farm.png"):
             st.image("farm.png", use_container_width=True, caption="싱그러운 과수원의 하루")
         else:
-            st.info("💡 우측에 멋진 움직이는 이미지를 띄우시려면, 원하시는 GIF 파일을 다운받아 이름을 **'farm.gif'**로 변경한 뒤 깃허브에 올려주세요!")
+            st.info("💡 깃허브에 'farm.gif' 또는 'farm.png' 이미지를 올려주시면 여기에 나타납니다.")
 
 elif menu == "농약명으로 찾기":
     col_limit, col_empty = st.columns([6, 4])
@@ -267,7 +272,7 @@ elif menu == "농약명으로 찾기":
         search_name = st.selectbox("찾으시는 농약 상품명을 선택하거나 입력하세요:", options=pesticide_list, index=None, placeholder="약제명 검색 또는 선택")
     if search_name:
         result = df_database[df_database['상품명'].astype(str) == search_name]
-        styled_res = result.style.set_properties(**{'font-size': '18px', 'font-weight': '600', 'padding': '12px'})
+        styled_res = result.style.set_properties(**{'font-size': '15px', 'font-weight': '600', 'padding': '8px 10px'})
         st.dataframe(styled_res, hide_index=True, use_container_width=True)
         
 elif menu == "병해충명으로 찾기":
@@ -277,7 +282,7 @@ elif menu == "병해충명으로 찾기":
         search_pest = st.selectbox("방제할 병해충명을 선택하거나 입력하세요:", options=pest_list, index=None, placeholder="병해충명 검색 또는 선택")
     if search_pest:
         result = df_database[df_database['적용병해충'].astype(str).str.contains(search_pest)]
-        styled_res = result.style.set_properties(**{'font-size': '18px', 'font-weight': '600', 'padding': '12px'})
+        styled_res = result.style.set_properties(**{'font-size': '15px', 'font-weight': '600', 'padding': '8px 10px'})
         st.dataframe(styled_res, hide_index=True, use_container_width=True)
         
 elif menu == "작용기작 설명 찾기":
@@ -295,4 +300,4 @@ elif menu == "정보교환마당":
 
 st.markdown("<br><br><br>", unsafe_allow_html=True)
 st.markdown("---")
-st.caption("<div style='text-align: center; color: gray; font-size: 1.4em;'><b>Developed by KIMBO & Gemini</b></div>", unsafe_allow_html=True)
+st.caption("<div style='text-align: center; color: gray; font-size: 1.1em;'><b>Developed by KIMBO & Gemini</b></div>", unsafe_allow_html=True)
