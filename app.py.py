@@ -2,12 +2,13 @@ import streamlit as st
 from datetime import date
 import pandas as pd
 import re
+import os  # 파일 존재 여부 확인을 위한 모듈 추가
 
 # 1. 앱 기본 설정
 st.set_page_config(page_title="내가 찾는 농약", page_icon="🍊", layout="wide")
 
 # ==========================================
-# 🎨 UI 디자인 3.0 업그레이드 (글자 크기 대폭 확대 및 3D 입체 버튼)
+# 🎨 UI 디자인 4.0 (메인메뉴 3D 버튼 완벽 적용 및 글씨 크기 최적화)
 # ==========================================
 st.markdown("""
     <style>
@@ -22,50 +23,57 @@ st.markdown("""
         text-align: center;
         color: white;
         font-weight: 900;
-        font-size: 4rem;
+        font-size: 3.5rem;
         box-shadow: 0px 10px 20px rgba(230, 81, 0, 0.4);
         margin-bottom: 40px;
         border: 4px solid #ffcc80;
         text-shadow: 3px 3px 6px rgba(0,0,0,0.4);
     }
 
-    /* 🌟 메인 메뉴 3D 버튼 (크기 대폭 확대) 🌟 */
-    div.row-widget.stRadio > div[role="radiogroup"] {
-        display: flex;
-        flex-direction: row;
-        justify-content: center;
-        flex-wrap: wrap;
-        gap: 25px;
-        margin-bottom: 40px;
-    }
-    div.row-widget.stRadio > div[role="radiogroup"] > label > div:first-child {
+    /* 🌟 메인 메뉴를 진짜 3D 버튼으로 변신시키는 마법의 코드 🌟 */
+    /* 기본 동그라미 라디오 버튼 숨기기 */
+    div[data-testid="stRadio"] div[role="radiogroup"] div[data-baseweb="radio"] div {
         display: none !important;
     }
-    div.row-widget.stRadio > div[role="radiogroup"] > label {
-        background: linear-gradient(145deg, #ffb74d, #f57c00);
-        border: 3px solid #e65100;
-        padding: 25px 40px;
-        border-radius: 25px;
-        box-shadow: 0px 12px 0px #bf360c, 0px 15px 20px rgba(0,0,0,0.3);
-        transition: all 0.1s ease-in-out;
-        cursor: pointer;
-    }
-    div.row-widget.stRadio > div[role="radiogroup"] > label div[data-testid="stMarkdownContainer"] p {
-        font-size: 34px !important; /* 글자 크기 대폭 확대 */
-        font-weight: 900 !important;
-        color: white !important;
-        margin: 0;
-        text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
-    }
-    /* 버튼 누를 때 입체적으로 들어가는 액션 효과 */
-    div.row-widget.stRadio > div[role="radiogroup"] > label:active,
-    div.row-widget.stRadio > div[role="radiogroup"] > label:focus-within {
-        background: linear-gradient(145deg, #f57c00, #e65100);
-        box-shadow: 0px 4px 0px #bf360c, 0px 6px 10px rgba(0,0,0,0.3);
-        transform: translateY(8px);
+    
+    /* 메뉴 항목들을 가로로 나란히, 간격을 띄워서 배치 */
+    div[data-testid="stRadio"] div[role="radiogroup"] {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 20px;
     }
 
-    /* 🌟 입력 폼 요소 글자 크기 2~3단계 확대 🌟 */
+    /* 3D 버튼 본체 디자인 */
+    div[data-testid="stRadio"] div[role="radiogroup"] label {
+        background: linear-gradient(145deg, #ffb74d, #f57c00) !important;
+        border: 3px solid #e65100 !important;
+        padding: 15px 30px !important;
+        border-radius: 20px !important;
+        box-shadow: 0px 8px 0px #bf360c, 0px 12px 15px rgba(0,0,0,0.3) !important;
+        cursor: pointer;
+        transition: all 0.1s ease-in-out;
+        margin: 0 !important;
+    }
+
+    /* 버튼 안의 글씨 크기 3단계 확대 (약 28px) */
+    div[data-testid="stRadio"] div[role="radiogroup"] label p {
+        font-size: 28px !important;
+        font-weight: 900 !important;
+        color: white !important;
+        margin: 0 !important;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+    }
+
+    /* 버튼을 눌렀을 때 쑥 들어가는 액션 효과 */
+    div[data-testid="stRadio"] div[role="radiogroup"] label:active {
+        transform: translateY(5px) !important;
+        box-shadow: 0px 3px 0px #bf360c, 0px 5px 8px rgba(0,0,0,0.3) !important;
+        background: linear-gradient(145deg, #f57c00, #e65100) !important;
+    }
+
+    /* 🌟 입력 폼 제목 글자 크기 🌟 */
     div[data-testid="stForm"] label p, 
     div[data-testid="stSelectbox"] label p, 
     div[data-testid="stMultiSelect"] label p, 
@@ -77,11 +85,13 @@ st.markdown("""
         margin-bottom: 10px;
     }
     
-    /* 입력창 내부 글자 크기 확대 */
+    /* 🌟 달력(날짜) 포함 모든 입력창 내부 글자 크기 확대 (24px) 🌟 */
     input[type="text"], 
     div[data-baseweb="select"] span, 
-    div[data-baseweb="select"] input {
+    div[data-baseweb="select"] input,
+    div[data-testid="stDateInput"] input {
         font-size: 24px !important;
+        padding: 10px !important;
     }
 
     /* 검색 폼 스타일링 */
@@ -93,7 +103,7 @@ st.markdown("""
         box-shadow: 0px 10px 30px rgba(255,183,77,0.2);
     }
 
-    /* 🌟 제출 버튼 화려하게 변경 및 크기 확대 🌟 */
+    /* 제출(검색) 버튼 디자인 */
     button[kind="secondaryFormSubmit"] {
         background: linear-gradient(to right, #4caf50, #2e7d32) !important;
         color: white !important;
@@ -105,7 +115,7 @@ st.markdown("""
         box-shadow: 0px 8px 0px #1b5e20, 0px 10px 15px rgba(0,0,0,0.3) !important;
         transition: all 0.1s;
         margin-top: 30px;
-        width: 100%; /* 버튼 가로 꽉 차게 */
+        width: 100%; 
     }
     button[kind="secondaryFormSubmit"]:active {
         box-shadow: 0px 3px 0px #1b5e20, 0px 5px 8px rgba(0,0,0,0.3) !important;
@@ -186,10 +196,10 @@ if menu == "내가 필요한 농약 찾기":
     
     with col_main:
         with st.form("search_form"):
-            # 🌟 입력창 가로 길이를 제한하기 위해 폼 내부를 다시 컬럼으로 분할 (입력창 60%, 여백 40%)
             form_col1, form_empty = st.columns([6, 4])
             
             with form_col1:
+                # 달력(날짜) 입력창 글자 크기도 CSS로 동일하게 커집니다.
                 spray_date = st.date_input("약제살포 예정일", value=date.today())
                 crop_type = st.selectbox("작물명", ["노지 감귤", "하우스 감귤", "비가림 감귤", "기타 과수"], index=0)
                 
@@ -240,9 +250,6 @@ if menu == "내가 필요한 농약 찾기":
                 else:
                     st.success(f"✅ 총 {len(filtered_df)}개의 약제가 검색되었습니다.")
 
-        # ==========================================
-        # 🌟 표 글자 크기 3단계 업그레이드 (28px)
-        # ==========================================
         if 'df_result' in st.session_state and not st.session_state.df_result.empty:
             current_df = st.session_state.df_result.head(st.session_state.list_count).copy()
             
@@ -255,7 +262,6 @@ if menu == "내가 필요한 농약 찾기":
             center_cols = [col for col in display_df.columns if col not in ['적용병해충', '계통', '금액 (원)']]
             left_cols = [col for col in display_df.columns if col in ['적용병해충', '계통']]
             
-            # 표 안의 글자 크기를 28px(1.8rem 상당)로 대폭 확대
             styled_df = display_df.style.set_properties(**{
                 'font-size': '28px',
                 'font-weight': '700',
@@ -276,7 +282,7 @@ if menu == "내가 필요한 농약 찾기":
                     st.session_state.list_count += 5
                     st.rerun()
 
-    # 우측 날씨 카드
+    # 우측 날씨 카드 & 로컬 이미지 적용
     with col_img:
         st.markdown("""
             <div class="weather-card">
@@ -285,10 +291,16 @@ if menu == "내가 필요한 농약 찾기":
                 🍃 바람: 3m/s (방제 양호)
             </div>
         """, unsafe_allow_html=True)
-        st.image("https://cdn.pixabay.com/animation/2022/10/27/12/37/12-37-33-289_512.gif", use_container_width=True, caption="싱그러운 과수원의 하루")
+        
+        # 🌟 직접 올린 이미지를 읽어오는 부분 🌟
+        if os.path.exists("farm.gif"):
+            st.image("farm.gif", use_container_width=True, caption="싱그러운 과수원의 하루")
+        elif os.path.exists("farm.png"):
+            st.image("farm.png", use_container_width=True, caption="싱그러운 과수원의 하루")
+        else:
+            st.info("💡 우측에 멋진 움직이는 이미지를 띄우시려면, 원하시는 GIF 파일을 다운받아 이름을 **'farm.gif'**로 변경한 뒤 깃허브에 엑셀 파일처럼 올려주세요!")
 
 elif menu == "농약명으로 찾기":
-    # 입력창 가로 길이 제한 적용
     col_limit, col_empty = st.columns([6, 4])
     with col_limit:
         st.subheader("🔍 농약명 검색")
@@ -299,7 +311,6 @@ elif menu == "농약명으로 찾기":
         st.dataframe(styled_res, hide_index=True, use_container_width=True)
         
 elif menu == "병해충명으로 찾기":
-    # 입력창 가로 길이 제한 적용
     col_limit, col_empty = st.columns([6, 4])
     with col_limit:
         st.subheader("🐛 병해충명 검색")
