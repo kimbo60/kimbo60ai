@@ -1,6 +1,7 @@
 import streamlit as st
 from datetime import date
 import pandas as pd
+import re  # 괄호 제거를 위한 정규표현식 라이브러리 추가
 
 # 앱 기본 설정
 st.set_page_config(page_title="내가 찾는 농약", page_icon="🍊", layout="wide")
@@ -26,15 +27,17 @@ def load_data():
     pesticide_raw = df["상품명"].astype(str).unique().tolist()
     pesticide_list = sorted([name.strip() for name in pesticide_raw if name.strip()])
     
-    # [병해충명 목록 추출 및 가나다순 정렬 (쉼표로 구분된 데이터 분리)]
+    # [병해충명 목록 추출 (괄호 제거 및 가나다순 정렬)]
     pest_raw = df["적용병해충"].astype(str).tolist()
     pest_set = set()
     for pests in pest_raw:
-        # 쉼표(,)를 기준으로 분리하여 개별 병해충명 추출
+        # 쉼표(,)를 기준으로 분리
         for p in pests.split(','):
-            p = p.strip()
-            if p:
-                pest_set.add(p)
+            # 정규표현식을 사용하여 괄호()와 그 안의 내용 모두 제거
+            p_clean = re.sub(r'\(.*?\)', '', p)
+            p_clean = p_clean.strip()
+            if p_clean:
+                pest_set.add(p_clean)
     pest_list = sorted(list(pest_set))
     
     return df, pesticide_list, pest_list
@@ -66,22 +69,27 @@ if menu == "내가 필요한 농약 찾기":
             # 2. 작물명
             crop_type = st.selectbox("작물명", ["노지 감귤", "하우스 감귤", "비가림 감귤", "기타 과수"], index=0)
             
-            # 3. 희망 약제명 (가나다순 목록 연동, 자동완성)
+            # 3. 희망 약제명 (자동완성)
             desired_pesticide = st.multiselect(
                 "희망 약제명 (클릭하여 선택하거나 직접 검색하세요)", 
                 options=pesticide_list,
                 placeholder="약제명 검색 또는 선택"
             )
             
-            # 4. 발생 병해충 (가나다순 목록 연동, 자동완성)
+            # 4. 발생 병해충 (자동완성, 괄호 제거됨)
             target_pest = st.multiselect(
                 "방제 대상 병해충 (클릭하여 선택하거나 직접 검색하세요)", 
                 options=pest_list,
                 placeholder="병해충명 검색 또는 선택"
             )
             
-            # 5. 총 살포량
-            total_volume = st.text_input("총 살포량", placeholder="예: 1000L 또는 50말")
+            # 5. 총 살포량 및 단위 선택
+            st.write("총 살포량")
+            col_vol1, col_vol2 = st.columns([3, 1])
+            with col_vol1:
+                total_volume = st.text_input("살포량 입력", placeholder="예: 1000", label_visibility="collapsed")
+            with col_vol2:
+                volume_unit = st.selectbox("단위", ["L", "말"], index=0, label_visibility="collapsed")
             
             # 검색 버튼
             submitted = st.form_submit_button("🔍 조건에 맞는 농약 찾기")
@@ -100,6 +108,7 @@ if menu == "내가 필요한 농약 찾기":
                 filtered_df = df_database.copy()
                 
                 if target_pest:
+                    # 선택된 병해충 이름이 적용병해충 열에 포함되는지 확인 (괄호 무시 검색 로직 추가 필요 시 추후 보완)
                     pattern = '|'.join(target_pest) 
                     filtered_df = filtered_df[filtered_df['적용병해충'].astype(str).str.contains(pattern)]
                     
@@ -131,7 +140,6 @@ if menu == "내가 필요한 농약 찾기":
 
 elif menu == "농약명으로 찾기":
     st.subheader("🔍 농약명 검색")
-    # 기존 텍스트 입력창에서, 검색 및 선택이 가능한 드롭다운 창(selectbox)으로 변경
     search_name = st.selectbox(
         "찾으시는 농약 상품명을 선택하거나 입력하세요:", 
         options=pesticide_list, 
@@ -144,7 +152,6 @@ elif menu == "농약명으로 찾기":
         
 elif menu == "병해충명으로 찾기":
     st.subheader("🐛 병해충명 검색")
-    # 기존 텍스트 입력창에서, 검색 및 선택이 가능한 드롭다운 창(selectbox)으로 변경
     search_pest = st.selectbox(
         "방제할 병해충명을 선택하거나 입력하세요:", 
         options=pest_list, 
