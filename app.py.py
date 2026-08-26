@@ -8,7 +8,7 @@ import os
 st.set_page_config(page_title="내가 찾는 농약", page_icon="🍊", layout="wide")
 
 # ==========================================
-# 🎨 UI 디자인 5.0 (스마트폰 반응형 모드 완벽 적용)
+# 🎨 UI 디자인 6.0 (메뉴 버튼 소형화 및 파스텔 톤 적용)
 # ==========================================
 st.markdown("""
     <style>
@@ -16,7 +16,7 @@ st.markdown("""
     .stApp { background-color: #fcf9f2; }
 
     /* ====================================================
-       💻 PC 화면 기본 디자인 (크고 화려하게)
+       💻 PC 화면 기본 디자인
        ==================================================== */
     .hallabong-title {
         background: linear-gradient(135deg, #ff9800 0%, #e65100 100%);
@@ -27,30 +27,40 @@ st.markdown("""
         font-weight: 900;
         font-size: 3.5rem;
         box-shadow: 0px 10px 20px rgba(230, 81, 0, 0.4);
-        margin-bottom: 40px;
+        margin-bottom: 30px;
         border: 4px solid #ffcc80;
         text-shadow: 3px 3px 6px rgba(0,0,0,0.4);
     }
     
+    /* 🌟 메인 메뉴 가로 간격 및 정렬 (한 줄에 쏙 들어가도록 수정) */
     div[data-testid="stRadio"] div[role="radiogroup"] {
-        display: flex; flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 20px;
+        display: flex; flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 12px;
     }
     div[data-testid="stRadio"] div[role="radiogroup"] div[data-baseweb="radio"] div { display: none !important; }
     
+    /* 🌟 3D 버튼 - 연한 파스텔 톤으로 수정 & 크기 축소 */
     div[data-testid="stRadio"] div[role="radiogroup"] label {
-        background: linear-gradient(145deg, #ffb74d, #f57c00) !important;
-        border: 3px solid #e65100 !important;
-        padding: 15px 30px !important;
-        border-radius: 20px !important;
-        box-shadow: 0px 8px 0px #bf360c, 0px 12px 15px rgba(0,0,0,0.3) !important;
+        background: linear-gradient(145deg, #e8f5e9, #c8e6c9) !important; /* 연한 파스텔 그린 */
+        border: 2px solid #a5d6a7 !important;
+        padding: 10px 18px !important; /* 버튼 여백 축소 */
+        border-radius: 15px !important;
+        box-shadow: 0px 6px 0px #81c784, 0px 8px 10px rgba(0,0,0,0.1) !important;
         cursor: pointer; transition: all 0.1s ease-in-out; margin: 0 !important;
     }
+    /* 버튼 글씨 크기 축소 및 어두운 색으로 변경 */
     div[data-testid="stRadio"] div[role="radiogroup"] label p {
-        font-size: 28px !important; font-weight: 900 !important; color: white !important; margin: 0 !important; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        font-size: 20px !important; /* 글자 크기 1단계 축소 */
+        font-weight: 800 !important; 
+        color: #1b5e20 !important; /* 파스텔톤에 어울리는 진녹색 글씨 */
+        margin: 0 !important; 
+        text-shadow: none !important; /* 파스텔톤을 위해 그림자 제거 */
     }
-    div[data-testid="stRadio"] div[role="radiogroup"] label:active {
-        transform: translateY(5px) !important; box-shadow: 0px 3px 0px #bf360c, 0px 5px 8px rgba(0,0,0,0.3) !important;
-        background: linear-gradient(145deg, #f57c00, #e65100) !important;
+    /* 버튼 누를 때 액션 */
+    div[data-testid="stRadio"] div[role="radiogroup"] label:active,
+    div[data-testid="stRadio"] div[role="radiogroup"] label:focus-within {
+        transform: translateY(4px) !important; 
+        box-shadow: 0px 2px 0px #81c784, 0px 4px 6px rgba(0,0,0,0.1) !important;
+        background: linear-gradient(145deg, #c8e6c9, #a5d6a7) !important;
     }
 
     div[data-testid="stForm"] label p, div[data-testid="stSelectbox"] label p, div[data-testid="stMultiSelect"] label p, div[data-testid="stTextInput"] label p, div[data-testid="stDateInput"] label p {
@@ -81,15 +91,14 @@ st.markdown("""
 
     /* ====================================================
        📱 스마트폰 화면 전용 디자인 (반응형 모드)
-       화면 가로 길이가 768px 이하일 때 자동으로 적용됩니다.
        ==================================================== */
     @media (max-width: 768px) {
         .hallabong-title { font-size: 2.2rem !important; padding: 20px !important; border-radius: 15px !important; }
         .hallabong-title img { width: 50px !important; margin-right: 10px !important; }
         
-        div[data-testid="stRadio"] div[role="radiogroup"] { gap: 10px !important; }
-        div[data-testid="stRadio"] div[role="radiogroup"] label { padding: 12px 15px !important; border-radius: 12px !important; border-width: 2px !important; }
-        div[data-testid="stRadio"] div[role="radiogroup"] label p { font-size: 18px !important; }
+        div[data-testid="stRadio"] div[role="radiogroup"] { gap: 8px !important; }
+        div[data-testid="stRadio"] div[role="radiogroup"] label { padding: 8px 12px !important; border-radius: 10px !important; border-width: 2px !important; }
+        div[data-testid="stRadio"] div[role="radiogroup"] label p { font-size: 15px !important; }
         
         div[data-testid="stForm"] { padding: 20px !important; border-radius: 15px !important; border-width: 2px !important; }
         div[data-testid="stForm"] label p, div[data-testid="stSelectbox"] label p, div[data-testid="stMultiSelect"] label p, div[data-testid="stTextInput"] label p, div[data-testid="stDateInput"] label p { font-size: 18px !important; }
@@ -162,7 +171,7 @@ if menu == "내가 필요한 농약 찾기":
     
     with col_main:
         with st.form("search_form"):
-            form_col1, form_empty = st.columns([7, 3]) # 모바일에서 너무 찌그러지지 않도록 비율 미세 조정
+            form_col1, form_empty = st.columns([7, 3]) 
             
             with form_col1:
                 spray_date = st.date_input("약제살포 예정일", value=date.today())
@@ -216,7 +225,6 @@ if menu == "내가 필요한 농약 찾기":
             center_cols = [col for col in display_df.columns if col not in ['적용병해충', '계통', '금액 (원)']]
             left_cols = [col for col in display_df.columns if col in ['적용병해충', '계통']]
             
-            # 표 폰트 크기를 모바일과 PC 모두에서 잘 보이도록 18px로 최적화 합의
             styled_df = display_df.style.set_properties(**{
                 'font-size': '18px',
                 'font-weight': '600',
