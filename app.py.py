@@ -1,7 +1,7 @@
 import streamlit as st
 from datetime import date
 import pandas as pd
-import re  # 괄호 제거를 위한 정규표현식 라이브러리 추가
+import re
 
 # 앱 기본 설정
 st.set_page_config(page_title="내가 찾는 농약", page_icon="🍊", layout="wide")
@@ -27,17 +27,24 @@ def load_data():
     pesticide_raw = df["상품명"].astype(str).unique().tolist()
     pesticide_list = sorted([name.strip() for name in pesticide_raw if name.strip()])
     
-    # [병해충명 목록 추출 (괄호 제거 및 가나다순 정렬)]
-    pest_raw = df["적용병해충"].astype(str).tolist()
+    # [병해충명 목록 추출 (살균제/살충제만 포함, 괄호 완전 제거 및 가나다순 정렬)]
+    # 제초제, 4종복비 등을 제외하고 오직 '살균제'와 '살충제' 행만 추려냄
+    df_pest_only = df[df['종류'].isin(['살균제', '살충제'])]
+    pest_raw = df_pest_only["적용병해충"].astype(str).tolist()
+    
     pest_set = set()
     for pests in pest_raw:
         # 쉼표(,)를 기준으로 분리
         for p in pests.split(','):
-            # 정규표현식을 사용하여 괄호()와 그 안의 내용 모두 제거
+            # 정규표현식을 사용하여 괄호()와 그 안의 내용 1차 제거
             p_clean = re.sub(r'\(.*?\)', '', p)
+            # 남아있을 수 있는 열린/닫힌 괄호 기호 강제 삭제
+            p_clean = p_clean.replace('(', '').replace(')', '')
             p_clean = p_clean.strip()
+            
             if p_clean:
                 pest_set.add(p_clean)
+                
     pest_list = sorted(list(pest_set))
     
     return df, pesticide_list, pest_list
@@ -69,14 +76,14 @@ if menu == "내가 필요한 농약 찾기":
             # 2. 작물명
             crop_type = st.selectbox("작물명", ["노지 감귤", "하우스 감귤", "비가림 감귤", "기타 과수"], index=0)
             
-            # 3. 희망 약제명 (자동완성)
+            # 3. 희망 약제명
             desired_pesticide = st.multiselect(
                 "희망 약제명 (클릭하여 선택하거나 직접 검색하세요)", 
                 options=pesticide_list,
                 placeholder="약제명 검색 또는 선택"
             )
             
-            # 4. 발생 병해충 (자동완성, 괄호 제거됨)
+            # 4. 발생 병해충
             target_pest = st.multiselect(
                 "방제 대상 병해충 (클릭하여 선택하거나 직접 검색하세요)", 
                 options=pest_list,
@@ -108,7 +115,7 @@ if menu == "내가 필요한 농약 찾기":
                 filtered_df = df_database.copy()
                 
                 if target_pest:
-                    # 선택된 병해충 이름이 적용병해충 열에 포함되는지 확인 (괄호 무시 검색 로직 추가 필요 시 추후 보완)
+                    # 선택된 병해충 필터링
                     pattern = '|'.join(target_pest) 
                     filtered_df = filtered_df[filtered_df['적용병해충'].astype(str).str.contains(pattern)]
                     
