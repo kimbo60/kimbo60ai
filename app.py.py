@@ -16,19 +16,33 @@ menu = st.radio(
 )
 st.markdown("---")
 
-# 2. 엑셀 데이터베이스 불러오기 (임시 데이터 완전 삭제)
+# 2. 엑셀 데이터베이스 불러오기 및 목록 추출
 @st.cache_data
 def load_data():
-    # 파일명을 요청하신 대로 변경하였습니다. (헤더가 두 번째 줄인 것을 반영)
     df = pd.read_excel('listall_nongyak.xlsx', header=1)
     df = df.fillna('')
-    return df
+    
+    # [농약명 목록 추출 및 가나다순 정렬]
+    pesticide_raw = df["상품명"].astype(str).unique().tolist()
+    pesticide_list = sorted([name.strip() for name in pesticide_raw if name.strip()])
+    
+    # [병해충명 목록 추출 및 가나다순 정렬 (쉼표로 구분된 데이터 분리)]
+    pest_raw = df["적용병해충"].astype(str).tolist()
+    pest_set = set()
+    for pests in pest_raw:
+        # 쉼표(,)를 기준으로 분리하여 개별 병해충명 추출
+        for p in pests.split(','):
+            p = p.strip()
+            if p:
+                pest_set.add(p)
+    pest_list = sorted(list(pest_set))
+    
+    return df, pesticide_list, pest_list
 
 # 엑셀 파일 로드 시도 및 에러 처리
 try:
-    df_database = load_data()
+    df_database, pesticide_list, pest_list = load_data()
 except Exception as e:
-    # 파일을 찾을 수 없거나 오류가 발생하면 명확한 원인을 띄우고 앱을 멈춥니다.
     st.error(f"🚨 엑셀 파일을 읽지 못했습니다. 'listall_nongyak.xlsx' 파일이 깃허브에 정확히 업로드되었는지 확인해주세요.\n\n(상세 에러: {e})")
     st.stop()
 
@@ -49,24 +63,21 @@ if menu == "내가 필요한 농약 찾기":
             # 1. 약제살포 예정일
             spray_date = st.date_input("약제살포 예정일", value=date.today())
             
-            # 2. 작물명 (기본값: 노지 감귤)
+            # 2. 작물명
             crop_type = st.selectbox("작물명", ["노지 감귤", "하우스 감귤", "비가림 감귤", "기타 과수"], index=0)
             
-            # 3. 희망 약제명 (DB 연동)
-            pesticide_list = df_database["상품명"].unique().tolist()
-            pesticide_list = [name for name in pesticide_list if str(name).strip()] # 빈 이름 제거
-            
+            # 3. 희망 약제명 (가나다순 목록 연동, 자동완성)
             desired_pesticide = st.multiselect(
-                "희망 약제명 (선택)", 
-                pesticide_list,
-                placeholder="약제명을 검색하거나 선택하세요"
+                "희망 약제명 (클릭하여 선택하거나 직접 검색하세요)", 
+                options=pesticide_list,
+                placeholder="약제명 검색 또는 선택"
             )
             
-            # 4. 발생 병해충
+            # 4. 발생 병해충 (가나다순 목록 연동, 자동완성)
             target_pest = st.multiselect(
-                "방제 대상 병해충 (선택)", 
-                ["궤양병", "더뎅이병", "검은점무늬병", "잿빛곰팡이병", "귤응애", "귤굴나방", "볼록총채벌레", "진딧물"],
-                placeholder="병해충명을 검색하거나 선택하세요"
+                "방제 대상 병해충 (클릭하여 선택하거나 직접 검색하세요)", 
+                options=pest_list,
+                placeholder="병해충명 검색 또는 선택"
             )
             
             # 5. 총 살포량
@@ -120,14 +131,26 @@ if menu == "내가 필요한 농약 찾기":
 
 elif menu == "농약명으로 찾기":
     st.subheader("🔍 농약명 검색")
-    search_name = st.text_input("찾으시는 농약 상품명을 입력하세요:")
+    # 기존 텍스트 입력창에서, 검색 및 선택이 가능한 드롭다운 창(selectbox)으로 변경
+    search_name = st.selectbox(
+        "찾으시는 농약 상품명을 선택하거나 입력하세요:", 
+        options=pesticide_list, 
+        index=None, 
+        placeholder="약제명 검색 또는 선택"
+    )
     if search_name:
-        result = df_database[df_database['상품명'].astype(str).str.contains(search_name)]
+        result = df_database[df_database['상품명'].astype(str) == search_name]
         st.dataframe(result, hide_index=True, use_container_width=True)
         
 elif menu == "병해충명으로 찾기":
     st.subheader("🐛 병해충명 검색")
-    search_pest = st.text_input("방제할 병해충명을 입력하세요:")
+    # 기존 텍스트 입력창에서, 검색 및 선택이 가능한 드롭다운 창(selectbox)으로 변경
+    search_pest = st.selectbox(
+        "방제할 병해충명을 선택하거나 입력하세요:", 
+        options=pest_list, 
+        index=None, 
+        placeholder="병해충명 검색 또는 선택"
+    )
     if search_pest:
         result = df_database[df_database['적용병해충'].astype(str).str.contains(search_pest)]
         st.dataframe(result, hide_index=True, use_container_width=True)
