@@ -9,7 +9,7 @@ import base64
 st.set_page_config(page_title="내가 찾는 농약", page_icon="🍊", layout="wide")
 
 # ==========================================
-# 🎨 UI 디자인 10.0 (살포량 입력창 최적화 및 10일 날씨 예보 추가)
+# 🎨 UI 디자인 10.1 (날씨 예보 에러 완벽 해결 버전)
 # ==========================================
 st.markdown("""
     <style>
@@ -52,7 +52,7 @@ st.markdown("""
     }
     button[kind="secondaryFormSubmit"]:active { box-shadow: 0px 2px 0px #1b5e20, 0px 4px 5px rgba(0,0,0,0.2) !important; transform: translateY(4px) !important; }
 
-    /* 날씨 카드 줄간격 축소 */
+    /* 날씨 카드 디자인 */
     .weather-card {
         background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%); padding: 15px 20px; border-radius: 15px; text-align: center;
         color: #3e2723; font-size: 1.15rem; font-weight: 800; line-height: 1.4; box-shadow: 0px 4px 12px rgba(0,0,0,0.1); margin-bottom: 15px; border: 3px solid #ffcc80;
@@ -165,8 +165,6 @@ if menu == "내가 필요한 농약 찾기":
                 target_pest = st.multiselect("방제 대상 병해충 (클릭하거나 검색)", options=pest_list, placeholder="병해충명 검색 또는 선택")
                 
                 st.markdown("<p style='font-size: 18px; font-weight: 800; color: #333333; margin-bottom: 5px; margin-top: 15px;'>총 살포량</p>", unsafe_allow_html=True)
-                
-                # 🌟 총 살포량 입력창과 단위를 한 줄에 가깝게 배치하도록 컬럼 비율 조정
                 col_vol1, col_vol2, col_vol3 = st.columns([2.5, 1.2, 3.3])
                 with col_vol1:
                     total_volume = st.text_input("살포량 입력", placeholder="예: 1000", label_visibility="collapsed")
@@ -203,7 +201,6 @@ if menu == "내가 필요한 농약 찾기":
                     st.rerun()
 
     with col_img:
-        # 실시간 날씨 카드 (줄간격 축소됨)
         st.markdown("""
             <div class="weather-card">
                 📍 제주시 조천읍 감귤원 실시간 날씨<br>
@@ -212,44 +209,33 @@ if menu == "내가 필요한 농약 찾기":
             </div>
         """, unsafe_allow_html=True)
         
-        # 🌟 향후 10일 날씨 예보 추가
-        st.markdown("<p style='font-size: 15px; font-weight: 800; color: #333333; margin-bottom: 8px;'>📅 향후 10일 방제 날씨 예보</p>", unsafe_allow_html=True)
+        # 🌟 향후 10일 날씨 예보 (에러 해결을 위해 안전한 Dataframe 표 방식으로 변경)
+        st.markdown("<p style='font-size: 15px; font-weight: 800; color: #333333; margin-bottom: 8px; margin-top: 10px;'>📅 향후 10일 방제 날씨 예보</p>", unsafe_allow_html=True)
         
         forecast_data = [
-            {"일자": "8/27(목)", "날씨": "☀️ 맑음", "기온": "24° / 29°", "방제": "최적"},
-            {"일자": "8/28(금)", "날씨": "⛅ 구름", "기온": "25° / 30°", "방제": "양호"},
-            {"일자": "8/29(토)", "날씨": "🌧️ 비", "기온": "24° / 27°", "방제": "불가"},
-            {"일자": "8/30(일)", "날씨": "☁️ 흐림", "기온": "23° / 26°", "방제": "보통"},
-            {"일자": "8/31(월)", "날씨": "☀️ 맑음", "기온": "24° / 28°", "방제": "최적"},
-            {"일자": "9/1(화)", "날씨": "☀️ 맑음", "기온": "23° / 28°", "방제": "최적"},
-            {"일자": "9/2(수)", "날씨": "⛅ 구름", "기온": "24° / 29°", "방제": "양호"},
-            {"일자": "9/3(목)", "날씨": "🌦️ 소나기", "기온": "23° / 27°", "방제": "주의"},
-            {"일자": "9/4(금)", "날씨": "☀️ 맑음", "기온": "23° / 28°", "방제": "최적"},
-            {"일자": "9/5(토)", "날씨": "☀️ 맑음", "기온": "24° / 29°", "방제": "최적"},
+            {"일자": "8/27(목)", "날씨": "☀️ 맑음", "기온": "24°/29°", "방제": "🟢 최적"},
+            {"일자": "8/28(금)", "날씨": "⛅ 구름", "기온": "25°/30°", "방제": "🔵 양호"},
+            {"일자": "8/29(토)", "날씨": "🌧️ 비", "기온": "24°/27°", "방제": "🔴 불가"},
+            {"일자": "8/30(일)", "날씨": "☁️ 흐림", "기온": "23°/26°", "방제": "🟠 보통"},
+            {"일자": "8/31(월)", "날씨": "☀️ 맑음", "기온": "24°/28°", "방제": "🟢 최적"},
+            {"일자": "9/1(화)",  "날씨": "☀️ 맑음", "기온": "23°/28°", "방제": "🟢 최적"},
+            {"일자": "9/2(수)",  "날씨": "⛅ 구름", "기온": "24°/29°", "방제": "🔵 양호"},
+            {"일자": "9/3(목)",  "날씨": "🌦️ 소나기", "기온": "23°/27°", "방제": "🟠 주의"},
+            {"일자": "9/4(금)",  "날씨": "☀️ 맑음", "기온": "23°/28°", "방제": "🟢 최적"},
+            {"일자": "9/5(토)",  "날씨": "☀️ 맑음", "기온": "24°/29°", "방제": "🟢 최적"},
         ]
         
-        forecast_html = """
-        <div style="background-color: #ffffff; padding: 10px; border-radius: 12px; border: 2px solid #ffcc80; box-shadow: 0px 4px 10px rgba(0,0,0,0.05); font-size: 13px;">
-            <table style="width: 100%; border-collapse: collapse; text-align: center;">
-                <tr style="border-bottom: 1px solid #eee; color: #666; font-weight: bold;">
-                    <td style="padding: 5px;">일자</td>
-                    <td style="padding: 5px;">날씨</td>
-                    <td style="padding: 5px;">기온(최저/최고)</td>
-                    <td style="padding: 5px;">방제</td>
-                </tr>
-        """
-        for f in forecast_data:
-            badge_color = "#2e7d32" if f["방제"] == "최적" else ("#1565c0" if f["방제"] == "양호" else ("#e65100" if f["방제"] == "보통" else "#c62828"))
-            forecast_html += f"""
-                <tr style="border-bottom: 1px solid #f9f9f9;">
-                    <td style="padding: 5px; font-weight: bold; color: #333;">{f['일자']}</td>
-                    <td style="padding: 5px;">{f['날씨']}</td>
-                    <td style="padding: 5px; color: #555;">{f['기온']}</td>
-                    <td style="padding: 5px;"><span style="background-color: {badge_color}; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: bold;">{f['방제']}</span></td>
-                </tr>
-            """
-        forecast_html += "</table></div>"
-        st.markdown(forecast_html, unsafe_allow_html=True)
+        df_weather = pd.DataFrame(forecast_data)
+        
+        # 날씨 표 스타일 지정
+        styled_weather = df_weather.style.set_properties(**{
+            'font-size': '13.5px',
+            'font-weight': '600',
+            'text-align': 'center',
+            'padding': '6px 5px'
+        })
+        
+        st.dataframe(styled_weather, hide_index=True, use_container_width=True)
         
         st.markdown("<br>", unsafe_allow_html=True)
         if os.path.exists("farm.gif"): st.image("farm.gif", use_container_width=True, caption="싱그러운 과수원의 하루")
