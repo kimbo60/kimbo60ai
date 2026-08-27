@@ -9,20 +9,17 @@ import base64
 st.set_page_config(page_title="내가 찾는 농약", page_icon="🍊", layout="wide")
 
 # ==========================================
-# 🎨 UI 디자인 13.0 (다크모드 방어 및 게시판 고도화)
+# 🎨 UI 디자인 14.0 (입력창 에러 완벽 복원 및 안정화 버전)
 # ==========================================
 st.markdown("""
     <style>
-    /* 강제 라이트 모드 유지 (다크모드 환경에서도 글씨가 검은색으로 보이도록 방어) */
-    html, body, [class*="st-"] {
-        color: #333333 !important;
-    }
-    .stApp { background-color: #fcf9f2 !important; }
+    /* 에러를 유발했던 강제 색상 고정 코드 모두 삭제 및 안정적인 V12 디자인으로 복원 */
+    .stApp { background-color: #fcf9f2; }
     
     a.home-link { text-decoration: none !important; }
     .hallabong-title {
         background: linear-gradient(135deg, #ff9800 0%, #e65100 100%);
-        padding: 15px; border-radius: 20px; text-align: center; color: white !important;
+        padding: 15px; border-radius: 20px; text-align: center; color: white;
         font-weight: 900; font-size: 2.8rem; box-shadow: 0px 6px 15px rgba(230, 81, 0, 0.3);
         margin-bottom: 20px; border: 3px solid #ffcc80; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
         transition: transform 0.2s ease-in-out;
@@ -42,10 +39,10 @@ st.markdown("""
         background: linear-gradient(145deg, #c8e6c9, #a5d6a7) !important;
     }
     div[data-testid="stForm"] label p, div[data-testid="stSelectbox"] label p, div[data-testid="stMultiSelect"] label p, div[data-testid="stTextInput"] label p, div[data-testid="stDateInput"] label p, div[data-testid="stTextArea"] label p, div[data-testid="stFileUploader"] label p {
-        font-size: 18px !important; font-weight: 800 !important; color: #333333 !important; margin-bottom: 5px;
+        font-size: 18px !important; font-weight: 800 !important; color: #333333; margin-bottom: 5px;
     }
-    input[type="text"], div[data-baseweb="select"] span, div[data-baseweb="select"] input, div[data-testid="stDateInput"] input, textarea { font-size: 16px !important; padding: 6px 10px !important; color: #000000 !important; background-color: #ffffff !important; }
-    div[data-testid="stForm"] { border: 3px solid #ffb74d; border-radius: 15px; padding: 25px; background-color: #ffffff !important; box-shadow: 0px 6px 15px rgba(255,183,77,0.15); margin-bottom: 15px; }
+    input[type="text"], div[data-baseweb="select"] span, div[data-baseweb="select"] input, div[data-testid="stDateInput"] input, textarea { font-size: 16px !important; padding: 6px 10px !important; }
+    div[data-testid="stForm"] { border: 3px solid #ffb74d; border-radius: 15px; padding: 25px; background-color: #ffffff; box-shadow: 0px 6px 15px rgba(255,183,77,0.15); margin-bottom: 15px; }
     button[kind="secondaryFormSubmit"] {
         background: linear-gradient(to right, #4caf50, #2e7d32) !important; color: white !important; font-size: 20px !important; font-weight: 800 !important;
         border-radius: 12px !important; padding: 12px 20px !important; border: none !important; box-shadow: 0px 6px 0px #1b5e20, 0px 8px 10px rgba(0,0,0,0.2) !important;
@@ -53,8 +50,8 @@ st.markdown("""
     }
     button[kind="secondaryFormSubmit"]:active { box-shadow: 0px 2px 0px #1b5e20, 0px 4px 5px rgba(0,0,0,0.2) !important; transform: translateY(4px) !important; }
     .weather-card {
-        background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%) !important; padding: 15px 20px; border-radius: 15px; text-align: center;
-        color: #3e2723 !important; font-size: 1.15rem; font-weight: 800; line-height: 1.4; box-shadow: 0px 4px 12px rgba(0,0,0,0.1); margin-bottom: 15px; border: 3px solid #ffcc80;
+        background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%); padding: 15px 20px; border-radius: 15px; text-align: center;
+        color: #3e2723; font-size: 1.15rem; font-weight: 800; line-height: 1.4; box-shadow: 0px 4px 12px rgba(0,0,0,0.1); margin-bottom: 15px; border: 3px solid #ffcc80;
     }
     @media (max-width: 768px) {
         .hallabong-title { font-size: 2rem !important; padding: 15px !important; border-radius: 12px !important; margin-bottom: 15px !important;}
@@ -63,7 +60,7 @@ st.markdown("""
         div[data-testid="stRadio"] div[role="radiogroup"] label { padding: 6px 10px !important; border-radius: 8px !important; border-width: 1px !important; }
         div[data-testid="stRadio"] div[role="radiogroup"] label p { font-size: 14px !important; }
         div[data-testid="stForm"] { padding: 15px !important; border-radius: 10px !important; border-width: 2px !important; }
-        div[data-testid="stForm"] label p, div[data-testid="stSelectbox"] label p, div[data-testid="stMultiSelect"] label p, div[data-testid="stTextInput"] label p, div[data-testid="stDateInput"] label p, div[data-testid="stTextArea"] label p { font-size: 16px !important; }
+        div[data-testid="stForm"] label p, div[data-testid="stSelectbox"] label p, div[data-testid="stMultiSelect"] label p, div[data-testid="stTextInput"] label p, div[data-testid="stDateInput"] label p, div[data-testid="stTextArea"] label p, div[data-testid="stFileUploader"] label p { font-size: 16px !important; }
         input[type="text"], div[data-baseweb="select"] span, div[data-baseweb="select"] input, div[data-testid="stDateInput"] input, textarea { font-size: 14px !important; padding: 5px !important; }
         button[kind="secondaryFormSubmit"] { font-size: 18px !important; padding: 10px !important; border-radius: 10px !important; box-shadow: 0px 4px 0px #1b5e20, 0px 5px 8px rgba(0,0,0,0.3) !important; margin-top: 10px !important; }
         button[kind="secondaryFormSubmit"]:active { box-shadow: 0px 1px 0px #1b5e20, 0px 2px 4px rgba(0,0,0,0.3) !important; transform: translateY(3px) !important; }
@@ -72,7 +69,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# 🌟 게시판 데이터 구조 업그레이드 (제목, 내용, 첨부파일 분리)
+# 🌟 게시판 데이터 구조 유지 (제목, 내용, 첨부파일 분리)
 if 'notices_v2' not in st.session_state:
     st.session_state.notices_v2 = [
         {"title": "[필독] 장마철 검은점무늬병 주의보 발령", "content": "누적 강수량 200mm 초과가 예상됩니다. 약제 살포 시기를 앞당겨 피해를 예방하시기 바랍니다.", "file": None},
@@ -153,8 +150,7 @@ def get_styled_dataframe(df, list_count=None):
     left_cols = [col for col in df.columns if col in ['적용병해충', '계통']]
     
     styled_df = df.style.set_properties(**{
-        'font-size': '15px', 'font-weight': '600', 'padding': '8px 10px', 'line-height': '1.3',
-        'color': '#000000' # 표 내용도 검은색 고정
+        'font-size': '15px', 'font-weight': '600', 'padding': '8px 10px', 'line-height': '1.3'
     })
     
     if center_cols: styled_df = styled_df.set_properties(subset=center_cols, **{'text-align': 'center'})
@@ -247,7 +243,7 @@ if menu == "내가 필요한 농약 찾기":
         
         df_weather = pd.DataFrame(forecast_data)
         styled_weather = df_weather.style.set_properties(**{
-            'font-size': '13.5px', 'font-weight': '600', 'text-align': 'center', 'padding': '6px 5px', 'color': '#333333'
+            'font-size': '13.5px', 'font-weight': '600', 'text-align': 'center', 'padding': '6px 5px'
         })
         st.dataframe(styled_weather, hide_index=True, use_container_width=True)
         
@@ -286,14 +282,13 @@ elif menu == "정보교환마당":
     col_notice, col_qa = st.columns(2)
     
     with col_notice:
-        # 🌟 공지사항 게시판 디자인 (네이티브 요소와 융합)
         st.markdown("""
             <div style='background-color: #fffde7; padding: 15px 25px; border-radius: 15px 15px 0 0; border: 2px solid #fdd835; border-bottom: none;'>
                 <h4 style='color: #f57f17; margin: 0; font-size: 22px;'>📢 공지사항</h4>
             </div>
         """, unsafe_allow_html=True)
         
-        # 공지사항 목록 출력 (제목 클릭 시 펼쳐짐)
+        # 🌟 글이 길어도 제목만 클릭하면 쫙 펼쳐지도록 유지
         for i, n in enumerate(st.session_state.notices_v2):
             with st.expander(f"📌 {n['title']}"):
                 st.write(n['content'])
@@ -307,7 +302,6 @@ elif menu == "정보교환마당":
         
         st.markdown("<hr style='border: 1px solid #fdd835; margin-top: 0;'>", unsafe_allow_html=True)
         
-        # 🌟 공지사항 작성 폼 (제목, 내용, 첨부파일 분리)
         with st.expander("➕ 새로운 공지 등록하기"):
             with st.form("notice_form", clear_on_submit=True):
                 new_title = st.text_input("공지 제목")
@@ -327,7 +321,6 @@ elif menu == "정보교환마당":
                     st.rerun()
 
     with col_qa:
-        # 🌟 묻고 답하기 게시판 디자인
         st.markdown("""
             <div style='background-color: #e3f2fd; padding: 15px 25px; border-radius: 15px 15px 0 0; border: 2px solid #64b5f6; border-bottom: none;'>
                 <h4 style='color: #1565c0; margin: 0; font-size: 22px;'>❓ 묻고 답하기 (Q&A)</h4>
