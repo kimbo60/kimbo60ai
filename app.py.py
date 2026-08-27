@@ -1,60 +1,57 @@
-import streamlit as st
+﻿import streamlit as st
 from datetime import date
 import pandas as pd
 import re
 import os
+import base64  # 🌟 로컬 이미지 변환을 위한 모듈 추가
+
 
 # 1. 앱 기본 설정
 st.set_page_config(page_title="내가 찾는 농약", page_icon="🍊", layout="wide")
 
+
 # ==========================================
-# 🎨 UI 디자인 7.0 (한 화면에 쏙 들어오는 슬림 & 컴팩트 모드)
+# 🎨 UI 디자인 8.0 (로컬 아이콘 파일 적용 버전)
 # ==========================================
 st.markdown("""
     <style>
     /* 전체 배경 */
     .stApp { background-color: #fcf9f2; }
 
-    /* ====================================================
-       💻 PC 화면 기본 디자인 (불필요한 여백 제거 및 슬림화)
-       ==================================================== */
+
     .hallabong-title {
         background: linear-gradient(135deg, #ff9800 0%, #e65100 100%);
-        padding: 15px; /* 타이틀 여백 대폭 축소 */
+        padding: 15px;
         border-radius: 20px;
         text-align: center;
         color: white;
         font-weight: 900;
-        font-size: 2.8rem; /* 타이틀 글씨 크기 축소 */
+        font-size: 2.8rem;
         box-shadow: 0px 6px 15px rgba(230, 81, 0, 0.3);
-        margin-bottom: 20px; /* 타이틀 아래 여백 축소 */
+        margin-bottom: 20px;
         border: 3px solid #ffcc80;
         text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
     }
     
-    /* 🌟 메인 메뉴 가로 간격 및 정렬 (한 줄에 쏙 들어가도록 수정) */
     div[data-testid="stRadio"] div[role="radiogroup"] {
         display: flex; flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 8px; margin-bottom: 15px;
     }
     div[data-testid="stRadio"] div[role="radiogroup"] div[data-baseweb="radio"] div { display: none !important; }
     
-    /* 🌟 3D 버튼 - 컴팩트 사이즈 및 파스텔 톤 */
     div[data-testid="stRadio"] div[role="radiogroup"] label {
         background: linear-gradient(145deg, #e8f5e9, #c8e6c9) !important; 
         border: 2px solid #a5d6a7 !important;
-        padding: 8px 16px !important; /* 버튼 여백 대폭 축소 */
+        padding: 8px 16px !important;
         border-radius: 12px !important;
         box-shadow: 0px 4px 0px #81c784, 0px 6px 8px rgba(0,0,0,0.1) !important;
         cursor: pointer; transition: all 0.1s ease-in-out; margin: 0 !important;
     }
-    /* 버튼 글씨 크기 17px로 조절하여 한 줄 배치 최적화 */
     div[data-testid="stRadio"] div[role="radiogroup"] label p {
         font-size: 17px !important; 
         font-weight: 800 !important; 
         color: #1b5e20 !important; 
         margin: 0 !important; 
     }
-    /* 버튼 누를 때 액션 */
     div[data-testid="stRadio"] div[role="radiogroup"] label:active,
     div[data-testid="stRadio"] div[role="radiogroup"] label:focus-within {
         transform: translateY(3px) !important; 
@@ -62,22 +59,21 @@ st.markdown("""
         background: linear-gradient(145deg, #c8e6c9, #a5d6a7) !important;
     }
 
-    /* 입력 폼 라벨(제목) 여백 및 크기 조절 */
+
     div[data-testid="stForm"] label p, div[data-testid="stSelectbox"] label p, div[data-testid="stMultiSelect"] label p, div[data-testid="stTextInput"] label p, div[data-testid="stDateInput"] label p {
         font-size: 18px !important; font-weight: 800 !important; color: #333333; margin-bottom: 5px;
     }
     
-    /* 입력창 내부 텍스트 크기 및 여백 컴팩트화 */
     input[type="text"], div[data-baseweb="select"] span, div[data-baseweb="select"] input, div[data-testid="stDateInput"] input {
         font-size: 16px !important; padding: 6px 10px !important;
     }
 
-    /* 폼 전체 여백 줄이기 */
+
     div[data-testid="stForm"] {
         border: 3px solid #ffb74d; border-radius: 15px; padding: 25px; background-color: #ffffff; box-shadow: 0px 6px 15px rgba(255,183,77,0.15); margin-bottom: 15px;
     }
 
-    /* 제출 버튼 슬림화 */
+
     button[kind="secondaryFormSubmit"] {
         background: linear-gradient(to right, #4caf50, #2e7d32) !important; color: white !important; font-size: 20px !important; font-weight: 800 !important;
         border-radius: 12px !important; padding: 12px 20px !important; border: none !important; box-shadow: 0px 6px 0px #1b5e20, 0px 8px 10px rgba(0,0,0,0.2) !important;
@@ -87,18 +83,16 @@ st.markdown("""
         box-shadow: 0px 2px 0px #1b5e20, 0px 4px 5px rgba(0,0,0,0.2) !important; transform: translateY(4px) !important;
     }
 
-    /* 우측 날씨 카드 컴팩트화 */
+
     .weather-card {
         background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%); padding: 20px; border-radius: 15px; text-align: center;
         color: #3e2723; font-size: 1.3rem; font-weight: 900; box-shadow: 0px 6px 15px rgba(0,0,0,0.1); margin-bottom: 15px; border: 3px solid #ffcc80;
     }
 
-    /* ====================================================
-       📱 스마트폰 화면 전용 디자인 (반응형 모드)
-       ==================================================== */
+
     @media (max-width: 768px) {
         .hallabong-title { font-size: 2rem !important; padding: 15px !important; border-radius: 12px !important; margin-bottom: 15px !important;}
-        .hallabong-title img { width: 45px !important; margin-right: 8px !important; }
+        .hallabong-title img { width: 40px !important; margin-right: 8px !important; }
         
         div[data-testid="stRadio"] div[role="radiogroup"] { gap: 6px !important; }
         div[data-testid="stRadio"] div[role="radiogroup"] label { padding: 6px 10px !important; border-radius: 8px !important; border-width: 1px !important; }
@@ -117,13 +111,34 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# 🍊 메인 타이틀
-st.markdown("""
+
+# 🌟 로컬 이미지 파일을 읽어서 Base64로 변환하는 함수
+def get_image_base64(path):
+    if os.path.exists(path):
+        with open(path, "rb") as f:
+            encoded = base64.b64encode(f.read()).decode()
+        return f"data:image/png;base64,{encoded}"
+    return None
+
+
+# 아이콘 파일 불러오기 시도
+icon_path = "아이콘001.png"
+icon_base64 = get_image_base64(icon_path)
+
+
+if icon_base64:
+    icon_tag = f'<img src="{icon_base64}" width="60" style="vertical-align: middle; margin-right: 15px; filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.3));">'
+else:
+    icon_tag = '🍊'  # 파일이 없을 경우 기본 오렌지 이모지 대체
+
+
+# 🍊 메인 타이틀 (아이콘 적용)
+st.markdown(f"""
     <div class='hallabong-title'>
-        <img src="https://cdn3d.iconscout.com/3d/premium/thumb/orange-4623192-3837943.png" width="70" style="vertical-align: middle; margin-right: 15px; drop-shadow: 3px 3px 6px rgba(0,0,0,0.5);">
-        내가 찾는 농약
+        {icon_tag} 내가 찾는 농약
     </div>
 """, unsafe_allow_html=True)
+
 
 # 1. 메인 메뉴 설정
 menu = st.radio(
@@ -133,6 +148,7 @@ menu = st.radio(
     label_visibility="collapsed"
 )
 st.markdown("<br>", unsafe_allow_html=True)
+
 
 # 2. 엑셀 데이터베이스 불러오기 및 목록 추출
 @st.cache_data
@@ -157,18 +173,22 @@ def load_data():
     pest_list = sorted(list(pest_set))
     return df, pesticide_list, pest_list
 
+
 try:
     df_database, pesticide_list, pest_list = load_data()
 except Exception as e:
     st.error(f"🚨 엑셀 파일을 읽지 못했습니다. 'listall_nongyak.xlsx' 파일 업로드 확인 요망.\n\n(상세 에러: {e})")
     st.stop()
 
+
 if 'list_count' not in st.session_state:
     st.session_state.list_count = 5
+
 
 # ==========================================
 # 3. 메뉴별 화면 구성
 # ==========================================
+
 
 if menu == "내가 필요한 농약 찾기":
     col_main, col_img = st.columns([7, 3])
@@ -193,6 +213,7 @@ if menu == "내가 필요한 농약 찾기":
             
             submitted = st.form_submit_button("🔎 조건에 맞는 농약 찾기")
 
+
         if submitted:
             st.session_state.list_count = 5
             
@@ -212,10 +233,12 @@ if menu == "내가 필요한 농약 찾기":
                 
                 st.session_state.df_result = filtered_df
 
+
                 if filtered_df.empty:
                     st.error("조건에 맞는 약제가 없습니다. 다른 조건으로 검색해 보세요.")
                 else:
                     st.success(f"✅ 총 {len(filtered_df)}개의 약제가 검색되었습니다.")
+
 
         if 'df_result' in st.session_state and not st.session_state.df_result.empty:
             current_df = st.session_state.df_result.head(st.session_state.list_count).copy()
@@ -228,7 +251,6 @@ if menu == "내가 필요한 농약 찾기":
             center_cols = [col for col in display_df.columns if col not in ['적용병해충', '계통', '금액 (원)']]
             left_cols = [col for col in display_df.columns if col in ['적용병해충', '계통']]
             
-            # 🌟 표 글자 크기 15px로 축소 및 내부 여백(Padding) 타이트하게 조절하여 컴팩트화
             styled_df = display_df.style.set_properties(**{
                 'font-size': '15px',
                 'font-weight': '600',
@@ -250,6 +272,7 @@ if menu == "내가 필요한 농약 찾기":
                     st.session_state.list_count += 5
                     st.rerun()
 
+
     with col_img:
         st.markdown("""
             <div class="weather-card">
@@ -264,6 +287,7 @@ if menu == "내가 필요한 농약 찾기":
             st.image("farm.png", use_container_width=True, caption="싱그러운 과수원의 하루")
         else:
             st.info("💡 깃허브에 'farm.gif' 또는 'farm.png' 이미지를 올려주시면 여기에 나타납니다.")
+
 
 elif menu == "농약명으로 찾기":
     col_limit, col_empty = st.columns([6, 4])
@@ -297,6 +321,7 @@ elif menu == "정보교환마당":
     with tab2:
         st.write("👤 **제주농부**: 잎 뒷면에 이런 하얀 딱지가 생겼는데 더뎅이병일까요?")
         st.write(" └ 👨‍🌾 **KIMBO**: 사진상으로는 볼록총채벌레 피해 흔적과 유사해 보입니다.")
+
 
 st.markdown("<br><br><br>", unsafe_allow_html=True)
 st.markdown("---")
