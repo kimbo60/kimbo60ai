@@ -9,13 +9,11 @@ import base64
 st.set_page_config(page_title="내가 찾는 농약", page_icon="🍊", layout="wide")
 
 # ==========================================
-# 🎨 UI 디자인 14.0 (입력창 에러 완벽 복원 및 안정화 버전)
+# 🎨 UI 디자인 14.0 (작용기작 사전 고급화 및 데이터 연동 수정)
 # ==========================================
 st.markdown("""
     <style>
-    /* 에러를 유발했던 강제 색상 고정 코드 모두 삭제 및 안정적인 V12 디자인으로 복원 */
     .stApp { background-color: #fcf9f2; }
-    
     a.home-link { text-decoration: none !important; }
     .hallabong-title {
         background: linear-gradient(135deg, #ff9800 0%, #e65100 100%);
@@ -38,7 +36,7 @@ st.markdown("""
         transform: translateY(3px) !important; box-shadow: 0px 1px 0px #81c784, 0px 3px 4px rgba(0,0,0,0.1) !important;
         background: linear-gradient(145deg, #c8e6c9, #a5d6a7) !important;
     }
-    div[data-testid="stForm"] label p, div[data-testid="stSelectbox"] label p, div[data-testid="stMultiSelect"] label p, div[data-testid="stTextInput"] label p, div[data-testid="stDateInput"] label p, div[data-testid="stTextArea"] label p, div[data-testid="stFileUploader"] label p {
+    div[data-testid="stForm"] label p, div[data-testid="stSelectbox"] label p, div[data-testid="stMultiSelect"] label p, div[data-testid="stTextInput"] label p, div[data-testid="stDateInput"] label p, div[data-testid="stTextArea"] label p {
         font-size: 18px !important; font-weight: 800 !important; color: #333333; margin-bottom: 5px;
     }
     input[type="text"], div[data-baseweb="select"] span, div[data-baseweb="select"] input, div[data-testid="stDateInput"] input, textarea { font-size: 16px !important; padding: 6px 10px !important; }
@@ -60,20 +58,26 @@ st.markdown("""
         div[data-testid="stRadio"] div[role="radiogroup"] label { padding: 6px 10px !important; border-radius: 8px !important; border-width: 1px !important; }
         div[data-testid="stRadio"] div[role="radiogroup"] label p { font-size: 14px !important; }
         div[data-testid="stForm"] { padding: 15px !important; border-radius: 10px !important; border-width: 2px !important; }
-        div[data-testid="stForm"] label p, div[data-testid="stSelectbox"] label p, div[data-testid="stMultiSelect"] label p, div[data-testid="stTextInput"] label p, div[data-testid="stDateInput"] label p, div[data-testid="stTextArea"] label p, div[data-testid="stFileUploader"] label p { font-size: 16px !important; }
+        div[data-testid="stForm"] label p, div[data-testid="stSelectbox"] label p, div[data-testid="stMultiSelect"] label p, div[data-testid="stTextInput"] label p, div[data-testid="stDateInput"] label p, div[data-testid="stTextArea"] label p { font-size: 16px !important; }
         input[type="text"], div[data-baseweb="select"] span, div[data-baseweb="select"] input, div[data-testid="stDateInput"] input, textarea { font-size: 14px !important; padding: 5px !important; }
         button[kind="secondaryFormSubmit"] { font-size: 18px !important; padding: 10px !important; border-radius: 10px !important; box-shadow: 0px 4px 0px #1b5e20, 0px 5px 8px rgba(0,0,0,0.3) !important; margin-top: 10px !important; }
         button[kind="secondaryFormSubmit"]:active { box-shadow: 0px 1px 0px #1b5e20, 0px 2px 4px rgba(0,0,0,0.3) !important; transform: translateY(3px) !important; }
         .weather-card { font-size: 1.05rem !important; padding: 12px 15px !important; border-radius: 12px !important; border-width: 2px !important; }
+        
+        div[data-testid="stForm"] div[data-testid="stHorizontalBlock"] div[data-testid="stHorizontalBlock"] {
+            flex-direction: row !important; flex-wrap: nowrap !important; gap: 10px !important;
+        }
+        div[data-testid="stForm"] div[data-testid="stHorizontalBlock"] div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+            width: auto !important; min-width: 0 !important; flex: 1 1 0% !important;
+        }
     }
     </style>
 """, unsafe_allow_html=True)
 
-# 🌟 게시판 데이터 구조 유지 (제목, 내용, 첨부파일 분리)
-if 'notices_v2' not in st.session_state:
-    st.session_state.notices_v2 = [
-        {"title": "[필독] 장마철 검은점무늬병 주의보 발령", "content": "누적 강수량 200mm 초과가 예상됩니다. 약제 살포 시기를 앞당겨 피해를 예방하시기 바랍니다.", "file": None},
-        {"title": "[안내] 신규 등록 약제(살균제) 3종 리스트 업데이트", "content": "새롭게 등록된 약제 3종이 엑셀 파일에 추가되었습니다. 검색을 통해 확인하세요.", "file": None}
+if 'notices' not in st.session_state:
+    st.session_state.notices = [
+        "<b>[필독]</b> 장마철 검은점무늬병 주의보 발령 (누적 강수량 200mm 초과 예상)",
+        "[안내] 신규 등록 약제(살균제) 3종 리스트 업데이트 완료"
     ]
 if 'qnas' not in st.session_state:
     st.session_state.qnas = [
@@ -127,6 +131,16 @@ def load_data():
     pest_list = sorted(list(pest_set))
     return df, pesticide_list, pest_list
 
+# 🌟 kijak.xlsx 로딩 함수
+@st.cache_data
+def load_moa_data():
+    try:
+        df_moa = pd.read_excel('kijak.xlsx')
+        df_moa = df_moa.fillna('')
+        return df_moa
+    except:
+        return pd.DataFrame()
+
 try:
     df_database, pesticide_list, pest_list = load_data()
 except Exception as e:
@@ -168,15 +182,17 @@ def get_styled_dataframe(df, list_count=None):
 if menu == "내가 필요한 농약 찾기":
     col_main, col_img = st.columns([7, 3])
     with col_main:
+        form_col_out1, form_empty_out = st.columns([7, 3])
+        with form_col_out1:
+            spray_date = st.date_input("약제살포 예정일", value=date.today())
+            weekdays = ['월', '화', '수', '목', '금', '토', '일']
+            weekday_str = weekdays[spray_date.weekday()]
+            formatted_date = spray_date.strftime(f"%Y년 %m월 %d일 ({weekday_str}요일)")
+            st.markdown(f"<div style='color: #1565c0; font-size: 16px; font-weight: bold; margin-top: -10px; margin-bottom: 15px; padding-left: 5px;'>👉 선택된 날짜: {formatted_date}</div>", unsafe_allow_html=True)
+
         with st.form("search_form"):
             form_col1, form_empty = st.columns([7, 3]) 
             with form_col1:
-                spray_date = st.date_input("약제살포 예정일", value=date.today())
-                weekdays = ['월', '화', '수', '목', '금', '토', '일']
-                weekday_str = weekdays[spray_date.weekday()]
-                formatted_date = spray_date.strftime(f"%Y년 %m월 %d일 ({weekday_str}요일)")
-                st.markdown(f"<div style='color: #1565c0; font-size: 16px; font-weight: bold; margin-top: -10px; margin-bottom: 15px; padding-left: 5px;'>👉 선택된 날짜: {formatted_date}</div>", unsafe_allow_html=True)
-                
                 crop_type = st.selectbox("작물명", ["노지 감귤", "하우스 감귤", "비가림 감귤", "기타 과수"], index=0)
                 desired_pesticide = st.multiselect("희망 약제명 (클릭하거나 검색)", options=pesticide_list, placeholder="약제명 검색 또는 선택")
                 target_pest = st.multiselect("방제 대상 병해충 (클릭하거나 검색)", options=pest_list, placeholder="병해충명 검색 또는 선택")
@@ -206,7 +222,7 @@ if menu == "내가 필요한 농약 찾기":
                 
                 st.session_state.df_result = filtered_df
                 if filtered_df.empty: st.error("조건에 맞는 약제가 없습니다.")
-                else: st.success(f"✅ 총 {len(filtered_df)}개의 약제가 검색되었습니다.")
+                else: st.success(f"✅ 총 {len(filtered_df)}개의 약제가 검색되었습니다. (💡 표의 열 제목을 클릭하면 정렬됩니다)")
 
         if 'df_result' in st.session_state and not st.session_state.df_result.empty:
             styled_df = get_styled_dataframe(st.session_state.df_result, st.session_state.list_count)
@@ -252,29 +268,86 @@ if menu == "내가 필요한 농약 찾기":
         elif os.path.exists("farm.png"): st.image("farm.png", use_container_width=True, caption="싱그러운 과수원의 하루")
 
 elif menu == "농약명으로 찾기":
-    col_limit, col_empty = st.columns([6, 4])
+    col_limit, col_empty = st.columns([7, 3])
     with col_limit:
         st.subheader("🔍 농약명 검색")
         search_name = st.selectbox("찾으시는 농약 상품명을 선택하거나 입력하세요:", options=pesticide_list, index=None, placeholder="약제명 검색 또는 선택")
-    if search_name:
+    
+    if search_name and search_name.strip() != "":
         result = df_database[df_database['상품명'].astype(str) == search_name]
+        st.success("💡 표의 열 제목('상품명', '금액' 등)을 클릭하면 정렬됩니다.")
         styled_res = get_styled_dataframe(result)
         st.dataframe(styled_res, hide_index=True, use_container_width=True)
+    else:
+        st.info("👆 위 입력창에 찾으시는 농약명(상품명)을 검색하거나 선택해주세요.")
         
 elif menu == "병해충명으로 찾기":
-    col_limit, col_empty = st.columns([6, 4])
+    col_limit, col_empty = st.columns([7, 3])
     with col_limit:
         st.subheader("🐛 병해충명 검색")
         search_pest = st.selectbox("방제할 병해충명을 선택하거나 입력하세요:", options=pest_list, index=None, placeholder="병해충명 검색 또는 선택")
-    if search_pest:
+    
+    if search_pest and search_pest.strip() != "":
         result = df_database[df_database['적용병해충'].astype(str).str.contains(search_pest)]
+        st.success("💡 표의 열 제목('상품명', '금액' 등)을 클릭하면 정렬됩니다.")
         styled_res = get_styled_dataframe(result)
         st.dataframe(styled_res, hide_index=True, use_container_width=True)
+    else:
+        st.info("👆 위 입력창에 찾으시는 병해충명을 검색하거나 선택해주세요.")
         
+# 🌟 작용기작 설명 찾기 기능 - 고급 UI 적용 🌟
 elif menu == "작용기작 설명 찾기":
-    st.subheader("🔬 작용기작 사전")
-    st.info("준비 중인 기능입니다. 향후 작용기작 코드를 입력하면 세부 설명과 교차 살포 경고가 연동될 예정입니다.")
-    
+    col_limit, col_empty = st.columns([7, 3])
+    with col_limit:
+        st.subheader("🔬 작용기작 사전")
+        
+        df_moa = load_moa_data()
+        if df_moa.empty:
+            st.error("🚨 작용기작 엑셀 파일('kijak.xlsx')을 찾을 수 없거나 읽을 수 없습니다. 깃허브에 파일이 정확히 올라가 있는지 확인해주세요.")
+        else:
+            moa_codes = sorted([str(code).strip() for code in df_moa['표시기호'].unique() if str(code).strip()])
+            
+            search_moa = st.selectbox("궁금한 작용기작 코드(표시기호)를 선택하거나 직접 입력하세요:", options=moa_codes, index=None, placeholder="예: 가1, 1a, H01")
+            
+            if search_moa and search_moa.strip() != "":
+                moa_result = df_moa[df_moa['표시기호'].astype(str) == search_moa].iloc[0]
+                
+                # 🌟 농약 종류에 따른 아이콘 자동 배정
+                nongyak_type = moa_result.get('농약종류', '')
+                type_icon = "🧪"
+                if "살균" in nongyak_type: type_icon = "🛡️"
+                elif "살충" in nongyak_type: type_icon = "🐛"
+                elif "제초" in nongyak_type: type_icon = "🌿"
+                
+                # 🌟 전문 도감 스타일의 결과 카드 출력
+                st.markdown(f"""
+                    <div style='background-color: #f8fbfa; padding: 25px; border-radius: 20px; border: 3px solid #66bb6a; box-shadow: 0px 8px 20px rgba(0,0,0,0.1); margin-top: 20px; position: relative; overflow: hidden;'>
+                        <div style='position: absolute; top: -15px; right: -15px; font-size: 110px; opacity: 0.04;'>{type_icon}</div>
+                        
+                        <h2 style='color: #1b5e20; margin-top: 0; font-size: 26px; font-weight: 900; margin-bottom: 25px;'>
+                            <span style='background-color: #e65100; color: white; padding: 5px 15px; border-radius: 12px; font-size: 30px;'>{search_moa}</span>
+                            <span style='margin-left: 10px; color: #43a047;'>작용기작 상세 정보</span>
+                        </h2>
+                        
+                        <div style='background-color: white; padding: 15px 20px; border-radius: 12px; box-shadow: 0px 2px 5px rgba(0,0,0,0.03); margin-bottom: 15px; border-left: 5px solid #1565c0;'>
+                            <p style='margin: 0; font-size: 14px; color: #757575; font-weight: 600;'>분류 (농약종류)</p>
+                            <p style='margin: 0; font-size: 20px; color: #1565c0; font-weight: 800;'>{type_icon} {nongyak_type}</p>
+                        </div>
+                        
+                        <div style='background-color: white; padding: 15px 20px; border-radius: 12px; box-shadow: 0px 2px 5px rgba(0,0,0,0.03); margin-bottom: 15px; border-left: 5px solid #e65100;'>
+                            <p style='margin: 0; font-size: 14px; color: #757575; font-weight: 600;'>작용기작 구분 (대분류)</p>
+                            <p style='margin: 0; font-size: 20px; color: #e65100; font-weight: 800;'>🧬 {moa_result.get('작용기작 구분', '')}</p>
+                        </div>
+                        
+                        <div style='background-color: #e8f5e9; padding: 20px; border-radius: 12px; border-left: 5px solid #2e7d32; box-shadow: 0px 2px 5px rgba(0,0,0,0.05);'>
+                            <p style='margin: 0; font-size: 15px; color: #2e7d32; font-weight: 800; margin-bottom: 8px;'>세부 작용기작 및 계통(성분)</p>
+                            <p style='margin: 0; font-size: 24px; color: #b71c1c; font-weight: 900; line-height: 1.4;'>🔬 {moa_result.get('세부 작용기작 및 계통(성분)', '')}</p>
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.info("👆 약제 라벨에 적힌 작용기작 코드(예: 가1, 1a, H01)를 검색창에 입력하시거나 목록에서 선택해주세요.")
+
 elif menu == "정보교환마당":
     st.subheader("💬 정보교환마당")
     st.markdown("<br>", unsafe_allow_html=True)
@@ -282,57 +355,37 @@ elif menu == "정보교환마당":
     col_notice, col_qa = st.columns(2)
     
     with col_notice:
-        st.markdown("""
-            <div style='background-color: #fffde7; padding: 15px 25px; border-radius: 15px 15px 0 0; border: 2px solid #fdd835; border-bottom: none;'>
-                <h4 style='color: #f57f17; margin: 0; font-size: 22px;'>📢 공지사항</h4>
-            </div>
-        """, unsafe_allow_html=True)
-        
-        # 🌟 글이 길어도 제목만 클릭하면 쫙 펼쳐지도록 유지
-        for i, n in enumerate(st.session_state.notices_v2):
-            with st.expander(f"📌 {n['title']}"):
-                st.write(n['content'])
-                if n.get('file'):
-                    st.download_button(
-                        label=f"📎 첨부파일 다운로드 ({n['file']['name']})",
-                        data=n['file']['data'],
-                        file_name=n['file']['name'],
-                        key=f"download_{i}"
-                    )
-        
-        st.markdown("<hr style='border: 1px solid #fdd835; margin-top: 0;'>", unsafe_allow_html=True)
+        notice_html = """
+            <div style='background-color: #fffde7; padding: 25px; border-radius: 15px; border: 2px solid #fdd835; box-shadow: 0px 4px 10px rgba(0,0,0,0.05); height: 100%; min-height: 350px;'>
+                <h4 style='color: #f57f17; margin-top: 0; font-size: 22px;'>📢 공지사항</h4>
+                <hr style='border-color: #fdd835; margin-top: 10px; margin-bottom: 15px;'>
+                <ul style='font-size: 16px; color: #333; line-height: 1.8;'>
+        """
+        for n in st.session_state.notices:
+            notice_html += f"<li>{n}</li>"
+        notice_html += "</ul></div>"
+        st.markdown(notice_html, unsafe_allow_html=True)
         
         with st.expander("➕ 새로운 공지 등록하기"):
             with st.form("notice_form", clear_on_submit=True):
-                new_title = st.text_input("공지 제목")
-                new_content = st.text_area("공지 내용 (긴 글 작성 가능)", height=150)
-                new_file = st.file_uploader("첨부파일 (선택사항)", type=['png', 'jpg', 'pdf', 'xlsx', 'hwp'])
-                
-                notice_submit = st.form_submit_button("공지 등록")
-                if notice_submit and new_title and new_content:
-                    file_info = None
-                    if new_file is not None:
-                        file_info = {"name": new_file.name, "data": new_file.getvalue()}
-                    st.session_state.notices_v2.append({
-                        "title": new_title,
-                        "content": new_content,
-                        "file": file_info
-                    })
+                new_notice = st.text_input("공지 내용 입력")
+                notice_submit = st.form_submit_button("등록")
+                if notice_submit and new_notice:
+                    st.session_state.notices.append(new_notice)
                     st.rerun()
 
     with col_qa:
-        st.markdown("""
-            <div style='background-color: #e3f2fd; padding: 15px 25px; border-radius: 15px 15px 0 0; border: 2px solid #64b5f6; border-bottom: none;'>
-                <h4 style='color: #1565c0; margin: 0; font-size: 22px;'>❓ 묻고 답하기 (Q&A)</h4>
-            </div>
-        """, unsafe_allow_html=True)
-        
-        qa_html = "<div style='padding: 10px 15px; border: 2px solid #64b5f6; border-top: none; font-size: 16px; color: #333; line-height: 1.6;'>"
+        qa_html = """
+            <div style='background-color: #e3f2fd; padding: 25px; border-radius: 15px; border: 2px solid #64b5f6; box-shadow: 0px 4px 10px rgba(0,0,0,0.05); height: 100%; min-height: 350px;'>
+                <h4 style='color: #1565c0; margin-top: 0; font-size: 22px;'>❓ 묻고 답하기 (Q&A)</h4>
+                <hr style='border-color: #64b5f6; margin-top: 10px; margin-bottom: 15px;'>
+                <div style='font-size: 16px; color: #333; line-height: 1.6;'>
+        """
         for q in st.session_state.qnas:
             qa_html += f"<p>👤 <b>{q['author']}</b>: {q['content']}</p>"
             if q['reply']:
                 qa_html += f"<p style='margin-left: 15px; color: #1565c0; font-weight: bold;'> └ {q['reply']}</p>"
-        qa_html += "</div>"
+        qa_html += "</div></div>"
         st.markdown(qa_html, unsafe_allow_html=True)
         
         with st.expander("➕ 새로운 질문 남기기"):
