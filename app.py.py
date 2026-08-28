@@ -9,7 +9,7 @@ import base64
 st.set_page_config(page_title="내가 찾는 농약", page_icon="🍊", layout="wide")
 
 # ==========================================
-# 🎨 UI 디자인 14.0 (작용기작 사전 고급화 및 데이터 연동 수정)
+# 🎨 UI 디자인 14.1 (마크다운 코드 블록 에러 수정)
 # ==========================================
 st.markdown("""
     <style>
@@ -99,12 +99,13 @@ if icon_base64:
 else:
     icon_tag = '🍊'
 
+# 🌟 들여쓰기 제거
 st.markdown(f"""
-    <a href="/" target="_self" class="home-link">
-        <div class='hallabong-title'>
-            {icon_tag} 내가 찾는 농약
-        </div>
-    </a>
+<a href="/" target="_self" class="home-link">
+    <div class='hallabong-title'>
+        {icon_tag} 내가 찾는 농약
+    </div>
+</a>
 """, unsafe_allow_html=True)
 
 menu = st.radio(
@@ -131,7 +132,6 @@ def load_data():
     pest_list = sorted(list(pest_set))
     return df, pesticide_list, pest_list
 
-# 🌟 kijak.xlsx 로딩 함수
 @st.cache_data
 def load_moa_data():
     try:
@@ -234,12 +234,13 @@ if menu == "내가 필요한 농약 찾기":
                     st.rerun()
 
     with col_img:
+        # 🌟 들여쓰기 제거
         st.markdown("""
-            <div class="weather-card">
-                📍 제주시 조천읍 감귤원 실시간 날씨<br>
-                🌤️ 기온: 28℃ | 습도: 75%<br>
-                🍃 풍속: 3.2 m/s (방제 최적)
-            </div>
+<div class="weather-card">
+    📍 제주시 조천읍 감귤원 실시간 날씨<br>
+    🌤️ 기온: 28℃ | 습도: 75%<br>
+    🍃 풍속: 3.2 m/s (방제 최적)
+</div>
         """, unsafe_allow_html=True)
         
         st.markdown("<p style='font-size: 15px; font-weight: 800; color: #333333; margin-bottom: 8px; margin-top: 10px;'>📅 향후 10일 방제 날씨 예보</p>", unsafe_allow_html=True)
@@ -295,7 +296,6 @@ elif menu == "병해충명으로 찾기":
     else:
         st.info("👆 위 입력창에 찾으시는 병해충명을 검색하거나 선택해주세요.")
         
-# 🌟 작용기작 설명 찾기 기능 - 고급 UI 적용 🌟
 elif menu == "작용기작 설명 찾기":
     col_limit, col_empty = st.columns([7, 3])
     with col_limit:
@@ -312,39 +312,34 @@ elif menu == "작용기작 설명 찾기":
             if search_moa and search_moa.strip() != "":
                 moa_result = df_moa[df_moa['표시기호'].astype(str) == search_moa].iloc[0]
                 
-                # 🌟 농약 종류에 따른 아이콘 자동 배정
                 nongyak_type = moa_result.get('농약종류', '')
                 type_icon = "🧪"
                 if "살균" in nongyak_type: type_icon = "🛡️"
                 elif "살충" in nongyak_type: type_icon = "🐛"
                 elif "제초" in nongyak_type: type_icon = "🌿"
                 
-                # 🌟 전문 도감 스타일의 결과 카드 출력
+                # 🌟 마크다운 코드 블록 오류 방지를 위해 왼쪽으로 바짝 붙여서 작성 (들여쓰기 제거)
                 st.markdown(f"""
-                    <div style='background-color: #f8fbfa; padding: 25px; border-radius: 20px; border: 3px solid #66bb6a; box-shadow: 0px 8px 20px rgba(0,0,0,0.1); margin-top: 20px; position: relative; overflow: hidden;'>
-                        <div style='position: absolute; top: -15px; right: -15px; font-size: 110px; opacity: 0.04;'>{type_icon}</div>
-                        
-                        <h2 style='color: #1b5e20; margin-top: 0; font-size: 26px; font-weight: 900; margin-bottom: 25px;'>
-                            <span style='background-color: #e65100; color: white; padding: 5px 15px; border-radius: 12px; font-size: 30px;'>{search_moa}</span>
-                            <span style='margin-left: 10px; color: #43a047;'>작용기작 상세 정보</span>
-                        </h2>
-                        
-                        <div style='background-color: white; padding: 15px 20px; border-radius: 12px; box-shadow: 0px 2px 5px rgba(0,0,0,0.03); margin-bottom: 15px; border-left: 5px solid #1565c0;'>
-                            <p style='margin: 0; font-size: 14px; color: #757575; font-weight: 600;'>분류 (농약종류)</p>
-                            <p style='margin: 0; font-size: 20px; color: #1565c0; font-weight: 800;'>{type_icon} {nongyak_type}</p>
-                        </div>
-                        
-                        <div style='background-color: white; padding: 15px 20px; border-radius: 12px; box-shadow: 0px 2px 5px rgba(0,0,0,0.03); margin-bottom: 15px; border-left: 5px solid #e65100;'>
-                            <p style='margin: 0; font-size: 14px; color: #757575; font-weight: 600;'>작용기작 구분 (대분류)</p>
-                            <p style='margin: 0; font-size: 20px; color: #e65100; font-weight: 800;'>🧬 {moa_result.get('작용기작 구분', '')}</p>
-                        </div>
-                        
-                        <div style='background-color: #e8f5e9; padding: 20px; border-radius: 12px; border-left: 5px solid #2e7d32; box-shadow: 0px 2px 5px rgba(0,0,0,0.05);'>
-                            <p style='margin: 0; font-size: 15px; color: #2e7d32; font-weight: 800; margin-bottom: 8px;'>세부 작용기작 및 계통(성분)</p>
-                            <p style='margin: 0; font-size: 24px; color: #b71c1c; font-weight: 900; line-height: 1.4;'>🔬 {moa_result.get('세부 작용기작 및 계통(성분)', '')}</p>
-                        </div>
-                    </div>
-                """, unsafe_allow_html=True)
+<div style='background-color: #f8fbfa; padding: 25px; border-radius: 20px; border: 3px solid #66bb6a; box-shadow: 0px 8px 20px rgba(0,0,0,0.1); margin-top: 20px; position: relative; overflow: hidden;'>
+    <div style='position: absolute; top: -15px; right: -15px; font-size: 110px; opacity: 0.04;'>{type_icon}</div>
+    <h2 style='color: #1b5e20; margin-top: 0; font-size: 26px; font-weight: 900; margin-bottom: 25px;'>
+        <span style='background-color: #e65100; color: white; padding: 5px 15px; border-radius: 12px; font-size: 30px;'>{search_moa}</span>
+        <span style='margin-left: 10px; color: #43a047;'>작용기작 상세 정보</span>
+    </h2>
+    <div style='background-color: white; padding: 15px 20px; border-radius: 12px; box-shadow: 0px 2px 5px rgba(0,0,0,0.03); margin-bottom: 15px; border-left: 5px solid #1565c0;'>
+        <p style='margin: 0; font-size: 14px; color: #757575; font-weight: 600;'>분류 (농약종류)</p>
+        <p style='margin: 0; font-size: 20px; color: #1565c0; font-weight: 800;'>{type_icon} {nongyak_type}</p>
+    </div>
+    <div style='background-color: white; padding: 15px 20px; border-radius: 12px; box-shadow: 0px 2px 5px rgba(0,0,0,0.03); margin-bottom: 15px; border-left: 5px solid #e65100;'>
+        <p style='margin: 0; font-size: 14px; color: #757575; font-weight: 600;'>작용기작 구분 (대분류)</p>
+        <p style='margin: 0; font-size: 20px; color: #e65100; font-weight: 800;'>🧬 {moa_result.get('작용기작 구분', '')}</p>
+    </div>
+    <div style='background-color: #e8f5e9; padding: 20px; border-radius: 12px; border-left: 5px solid #2e7d32; box-shadow: 0px 2px 5px rgba(0,0,0,0.05);'>
+        <p style='margin: 0; font-size: 15px; color: #2e7d32; font-weight: 800; margin-bottom: 8px;'>세부 작용기작 및 계통(성분)</p>
+        <p style='margin: 0; font-size: 24px; color: #b71c1c; font-weight: 900; line-height: 1.4;'>🔬 {moa_result.get('세부 작용기작 및 계통(성분)', '')}</p>
+    </div>
+</div>
+""", unsafe_allow_html=True)
             else:
                 st.info("👆 약제 라벨에 적힌 작용기작 코드(예: 가1, 1a, H01)를 검색창에 입력하시거나 목록에서 선택해주세요.")
 
@@ -355,11 +350,12 @@ elif menu == "정보교환마당":
     col_notice, col_qa = st.columns(2)
     
     with col_notice:
+        # 🌟 들여쓰기 제거
         notice_html = """
-            <div style='background-color: #fffde7; padding: 25px; border-radius: 15px; border: 2px solid #fdd835; box-shadow: 0px 4px 10px rgba(0,0,0,0.05); height: 100%; min-height: 350px;'>
-                <h4 style='color: #f57f17; margin-top: 0; font-size: 22px;'>📢 공지사항</h4>
-                <hr style='border-color: #fdd835; margin-top: 10px; margin-bottom: 15px;'>
-                <ul style='font-size: 16px; color: #333; line-height: 1.8;'>
+<div style='background-color: #fffde7; padding: 25px; border-radius: 15px; border: 2px solid #fdd835; box-shadow: 0px 4px 10px rgba(0,0,0,0.05); height: 100%; min-height: 350px;'>
+    <h4 style='color: #f57f17; margin-top: 0; font-size: 22px;'>📢 공지사항</h4>
+    <hr style='border-color: #fdd835; margin-top: 10px; margin-bottom: 15px;'>
+    <ul style='font-size: 16px; color: #333; line-height: 1.8;'>
         """
         for n in st.session_state.notices:
             notice_html += f"<li>{n}</li>"
@@ -375,11 +371,12 @@ elif menu == "정보교환마당":
                     st.rerun()
 
     with col_qa:
+        # 🌟 들여쓰기 제거
         qa_html = """
-            <div style='background-color: #e3f2fd; padding: 25px; border-radius: 15px; border: 2px solid #64b5f6; box-shadow: 0px 4px 10px rgba(0,0,0,0.05); height: 100%; min-height: 350px;'>
-                <h4 style='color: #1565c0; margin-top: 0; font-size: 22px;'>❓ 묻고 답하기 (Q&A)</h4>
-                <hr style='border-color: #64b5f6; margin-top: 10px; margin-bottom: 15px;'>
-                <div style='font-size: 16px; color: #333; line-height: 1.6;'>
+<div style='background-color: #e3f2fd; padding: 25px; border-radius: 15px; border: 2px solid #64b5f6; box-shadow: 0px 4px 10px rgba(0,0,0,0.05); height: 100%; min-height: 350px;'>
+    <h4 style='color: #1565c0; margin-top: 0; font-size: 22px;'>❓ 묻고 답하기 (Q&A)</h4>
+    <hr style='border-color: #64b5f6; margin-top: 10px; margin-bottom: 15px;'>
+    <div style='font-size: 16px; color: #333; line-height: 1.6;'>
         """
         for q in st.session_state.qnas:
             qa_html += f"<p>👤 <b>{q['author']}</b>: {q['content']}</p>"
