@@ -1,5 +1,5 @@
 import streamlit as st
-from datetime import date
+from datetime import date, timedelta
 import pandas as pd
 import re
 import os
@@ -9,7 +9,7 @@ import base64
 st.set_page_config(page_title="내가 찾는 농약", page_icon="🍊", layout="wide")
 
 # ==========================================
-# 🎨 UI 디자인 17.0 (나의 방제이력 메뉴 추가)
+# 🎨 UI 디자인 18.0 (방제이력 상세화 및 날씨 7일 자동화)
 # ==========================================
 st.markdown("""
     <style>
@@ -38,10 +38,10 @@ st.markdown("""
         background: linear-gradient(145deg, #c8e6c9, #a5d6a7) !important;
     }
 
-    div[data-testid="stForm"] label p, div[data-testid="stSelectbox"] label p, div[data-testid="stMultiSelect"] label p, div[data-testid="stTextInput"] label p, div[data-testid="stDateInput"] label p, div[data-testid="stTextArea"] label p {
+    div[data-testid="stForm"] label p, div[data-testid="stSelectbox"] label p, div[data-testid="stMultiSelect"] label p, div[data-testid="stTextInput"] label p, div[data-testid="stDateInput"] label p, div[data-testid="stTimeInput"] label p, div[data-testid="stTextArea"] label p {
         font-size: 18px !important; font-weight: 800 !important; margin-bottom: 5px;
     }
-    input[type="text"], div[data-baseweb="select"] span, div[data-baseweb="select"] input, div[data-testid="stDateInput"] input, textarea { 
+    input[type="text"], div[data-baseweb="select"] span, div[data-baseweb="select"] input, div[data-testid="stDateInput"] input, div[data-testid="stTimeInput"] input, textarea { 
         font-size: 16px !important; padding: 6px 10px !important; 
     }
     
@@ -72,7 +72,7 @@ st.markdown("""
     .moa-inner.detail { background-color: #e8f5e9; border-left: 5px solid #2e7d32; color: #333;}
 
     @media (prefers-color-scheme: dark) {
-        input[type="text"], div[data-baseweb="select"] > div, div[data-testid="stDateInput"] > div, textarea {
+        input[type="text"], div[data-baseweb="select"] > div, div[data-testid="stDateInput"] > div, div[data-testid="stTimeInput"] > div, textarea {
             background-color: #3b3b3b !important; border: 1px solid #555555 !important; color: #f1f1f1 !important;
         }
         div[data-testid="stForm"] { background-color: #1e1e1e !important; border-color: #555 !important; }
@@ -115,15 +115,20 @@ if 'qnas' not in st.session_state:
     st.session_state.qnas = [
         {"author": "제주농부", "content": "잎 뒷면에 이런 하얀 딱지가 생겼는데 더뎅이병일까요?", "reply": "👨‍🌾 KIMBO: 사진상으로는 볼록총채벌레 피해 흔적과 유사해 보입니다."}
     ]
-# 🌟 방제 이력 저장용 세션 데이터 초기화 (미리 보기용 샘플 2개 포함)
+
+# 🌟 방제 이력 상세 필드 적용 (샘플 데이터 업데이트)
 if 'spray_history' not in st.session_state:
     st.session_state.spray_history = pd.DataFrame({
-        "방제일자": ["2026-08-10", "2026-08-20"],
-        "작물명": ["노지 감귤", "노지 감귤"],
-        "사용약제": ["다이센엠", "모스피란"],
-        "대상병해충": ["검은점무늬병", "진딧물, 깍지벌레"],
-        "살포량": ["1000 L", "1000 L"],
-        "메모": ["장마 후 예방살포", "발생 초기 방제"]
+        "방제일자": ["2026년 08월 12일(수)"],
+        "방제시작": ["05:00"],
+        "총 살포량": ["1000 L"],
+        "약제종류": ["살균제"],
+        "상품명": ["다이센엠"],
+        "작용기작": ["카"],
+        "규격": ["1kg"],
+        "수량": ["2개"],
+        "적용병해충": ["검은점무늬병"],
+        "계통": ["만코제브"]
     })
 
 @st.cache_data
@@ -213,6 +218,7 @@ def render_moa_popup_trigger(df_current_result):
         with col_btn:
             if st.button("팝업 열기 🔍"): show_moa_popup(str(selected_moa))
 
+# 🌟 날씨 1주일 자동 계산 기능 적용
 def render_weather_section():
     st.markdown("""
         <div class="custom-card card-weather">
@@ -220,16 +226,22 @@ def render_weather_section():
             🌤️ 기온: 28℃ | 습도: 75%<br>
             🍃 풍속: 3.2 m/s (방제 최적)
         </div>
-        <p style='font-size: 15px; font-weight: 800; margin-bottom: 8px; margin-top: 10px;'>📅 향후 10일 방제 날씨 예보</p>
+        <p style='font-size: 15px; font-weight: 800; margin-bottom: 8px; margin-top: 10px;'>📅 향후 1주일 방제 날씨 예보</p>
     """, unsafe_allow_html=True)
     
-    forecast_data = [
-        {"일자": "8/27(목)", "날씨": "☀️ 맑음", "기온": "24°/29°", "방제": "🟢 최적"},
-        {"일자": "8/28(금)", "날씨": "⛅ 구름", "기온": "25°/30°", "방제": "🔵 양호"},
-        {"일자": "8/29(토)", "날씨": "🌧️ 비", "기온": "24°/27°", "방제": "🔴 불가"},
-        {"일자": "8/30(일)", "날씨": "☁️ 흐림", "기온": "23°/26°", "방제": "🟠 보통"},
-        {"일자": "8/31(월)", "날씨": "☀️ 맑음", "기온": "24°/28°", "방제": "🟢 최적"},
-    ]
+    today = date.today()
+    weekdays_kr = ['월', '화', '수', '목', '금', '토', '일']
+    
+    # 예시용 날씨 데이터 풀 (실제 API 연동 전까지 반복 사용)
+    weather_pool = [("☀️ 맑음", "24°/29°", "🟢 최적"), ("⛅ 구름", "25°/30°", "🔵 양호"), ("☁️ 흐림", "23°/26°", "🟠 보통"), ("🌧️ 비", "24°/27°", "🔴 불가"), ("☀️ 맑음", "25°/30°", "🟢 최적"), ("🌦️ 소나기", "24°/28°", "🟠 주의"), ("⛅ 구름", "26°/31°", "🔵 양호")]
+    
+    forecast_data = []
+    for i in range(7):
+        target_date = today + timedelta(days=i)
+        date_str = target_date.strftime(f"%m/%d({weekdays_kr[target_date.weekday()]})")
+        w_icon, w_temp, w_status = weather_pool[i]
+        forecast_data.append({"일자": date_str, "날씨": w_icon, "기온": w_temp, "방제": w_status})
+        
     styled_weather = pd.DataFrame(forecast_data).style.set_properties(**{
         'font-size': '13.5px', 'font-weight': '600', 'text-align': 'center', 'padding': '6px 5px'
     })
@@ -245,7 +257,6 @@ icon_tag = f'<img src="{icon_base64}" width="60" style="vertical-align: middle; 
 
 st.markdown(f"<a href='/' target='_self' class='home-link'><div class='hallabong-title'>{icon_tag} 내가 찾는 농약</div></a>", unsafe_allow_html=True)
 
-# 🌟 메뉴 이름 변경 및 방제이력 메뉴 추가 적용
 menu = st.radio(
     "메인 메뉴", 
     ["내가 필요한 농약 찾기", "농약명으로 찾기", "병해충명으로 찾기", "작용기작 찾기", "나의 방제이력", "정보교환마당"],
@@ -364,54 +375,71 @@ elif menu == "작용기작 찾기":
                 st.info("👆 코드(예: 가1, 1a, H01)를 검색창에 입력해주세요.")
 
 # ----------------------------------------
-# 🌟 메뉴 5: 나의 방제이력 (신규 추가) 🌟
+# 🌟 메뉴 5: 나의 방제이력 (고도화 반영)
 # ----------------------------------------
 elif menu == "나의 방제이력":
     st.subheader("📋 나의 방제이력 (방제 일지)")
     
-    # 1. 저장된 이력 표로 보여주기
     if st.session_state.spray_history.empty:
         st.info("아직 등록된 방제 이력이 없습니다. 아래에서 새로운 기록을 추가해보세요!")
     else:
         styled_history = st.session_state.spray_history.style.set_properties(**{
-            'font-size': '15px', 'text-align': 'center', 'padding': '8px 10px'
+            'font-size': '14.5px', 'text-align': 'center', 'padding': '8px 10px'
         })
         st.dataframe(styled_history, hide_index=True, use_container_width=True)
         
     st.markdown("<br>", unsafe_allow_html=True)
     
-    # 2. 새로운 이력 등록 폼
     with st.expander("➕ 새로운 방제 기록 추가하기", expanded=False):
         with st.form("history_form", clear_on_submit=True):
-            col_h1, col_h2 = st.columns(2)
-            
+            col_h1, col_h2, col_h3 = st.columns(3)
             with col_h1:
-                h_date = st.date_input("방제일자", value=date.today())
-                h_crop = st.selectbox("작물명", ["노지 감귤", "하우스 감귤", "비가림 감귤", "기타 과수"])
-                h_pest = st.text_input("대상 병해충", placeholder="예: 검은점무늬병, 응애 등")
-                
+                h_date = st.date_input("📅 방제일자", value=date.today())
             with col_h2:
-                h_pesticide = st.text_input("사용 약제명", placeholder="예: 다이센엠, 기계유유제 등")
-                col_vol1, col_vol2 = st.columns([2, 1], gap="small")
-                with col_vol1: h_vol = st.text_input("살포량", placeholder="예: 1000")
-                with col_vol2: h_unit = st.selectbox("단위", ["L", "말"])
-                h_memo = st.text_input("특이사항 (메모)", placeholder="예: 비 오기 전 예방살포")
+                # 기본 시간을 오전 5시로 세팅
+                h_time = st.time_input("⏰ 방제시작", value=pd.to_datetime("05:00").time())
+            with col_h3:
+                col_v1, col_v2 = st.columns([2, 1], gap="small")
+                with col_v1: h_vol = st.text_input("💧 총 살포량", placeholder="예: 1000")
+                with col_v2: h_unit = st.selectbox("단위", ["L", "말"], label_visibility="collapsed")
             
-            if st.form_submit_button("💾 기록 저장하기"):
-                if h_pesticide and h_pest:
+            st.markdown("<hr style='margin: 15px 0;'>", unsafe_allow_html=True)
+            st.markdown("<p style='font-size:18px; font-weight:bold;'>🧪 살포 약제 상세 정보</p>", unsafe_allow_html=True)
+            
+            col_p1, col_p2, col_p3 = st.columns(3)
+            with col_p1: h_type = st.selectbox("약제종류", ["살균제", "살충제", "제초제", "기타"])
+            with col_p2: h_name = st.text_input("상품명", placeholder="예: 다이센엠")
+            with col_p3: h_moa = st.text_input("작용기작", placeholder="예: 카")
+            
+            col_p4, col_p5, col_p6, col_p7 = st.columns(4)
+            with col_p4: h_size = st.text_input("규격", placeholder="예: 1kg")
+            with col_p5: h_qty = st.text_input("수량", placeholder="예: 2개")
+            with col_p6: h_pest = st.text_input("적용병해충", placeholder="예: 검은점무늬병")
+            with col_p7: h_family = st.text_input("계통", placeholder="예: 만코제브")
+            
+            if st.form_submit_button("💾 세부 기록 저장하기"):
+                if h_name and h_pest:
+                    weekdays_kr = ['월', '화', '수', '목', '금', '토', '일']
+                    dt_str = h_date.strftime(f"%Y년 %m월 %d일({weekdays_kr[h_date.weekday()]})")
+                    time_str = h_time.strftime("%H:%M")
+                    
                     new_record = pd.DataFrame([{
-                        "방제일자": h_date.strftime("%Y-%m-%d"),
-                        "작물명": h_crop,
-                        "사용약제": h_pesticide,
-                        "대상병해충": h_pest,
-                        "살포량": f"{h_vol} {h_unit}",
-                        "메모": h_memo
+                        "방제일자": dt_str,
+                        "방제시작": time_str,
+                        "총 살포량": f"{h_vol} {h_unit}",
+                        "약제종류": h_type,
+                        "상품명": h_name,
+                        "작용기작": h_moa,
+                        "규격": h_size,
+                        "수량": h_qty,
+                        "적용병해충": h_pest,
+                        "계통": h_family
                     }])
                     st.session_state.spray_history = pd.concat([st.session_state.spray_history, new_record], ignore_index=True)
-                    st.success("✅ 방제 기록이 성공적으로 저장되었습니다.")
+                    st.success("✅ 상세 방제 기록이 성공적으로 저장되었습니다.")
                     st.rerun()
                 else:
-                    st.error("⚠️ '사용 약제명'과 '대상 병해충'은 반드시 입력해 주세요.")
+                    st.error("⚠️ '상품명'과 '적용병해충'은 반드시 입력해 주세요.")
 
 # ----------------------------------------
 # 메뉴 6: 정보교환마당
