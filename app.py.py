@@ -188,7 +188,6 @@ def render_moa_popup_trigger(df_current_result):
         with col_btn: 
             if st.button("팝업 열기 🔍"): show_moa_popup(str(selected_moa))
 
-# 병해충 상세 팝업 (새로 추가된 기능)
 @st.dialog("🦠 병해충 상세 정보")
 def show_pest_popup(pest_name, prob, desc):
     st.markdown(f"""
@@ -224,7 +223,6 @@ icon_base64 = get_image_base64("아이콘001.png")
 icon_tag = f'<img src="{icon_base64}" width="60" style="vertical-align: middle; margin-right: 15px; filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.3));">' if icon_base64 else '🍊'
 st.markdown(f"<a href='/' target='_self' class='home-link'><div class='hallabong-title'>{icon_tag} 내가 찾는 농약</div></a>", unsafe_allow_html=True)
 
-# 나의 방제이력과 정보교환마당 사이에 "병충해 찾기" 메뉴 추가
 menu = st.radio("메인 메뉴", ["내가 필요한 농약 찾기", "농약명으로 찾기", "병해충명으로 찾기", "작용기작 찾기", "나의 방제이력", "병충해 찾기", "정보교환마당"], horizontal=True, label_visibility="collapsed")
 st.markdown("<br>", unsafe_allow_html=True)
 
@@ -352,98 +350,94 @@ elif menu == "나의 방제이력":
         st.markdown("<hr style='margin: 15px 0;'>", unsafe_allow_html=True)
         num_pest = st.selectbox("🔀 한 번에 섞어서 칠(혼용할) 약제는 몇 가지인가요?", [1, 2, 3, 4, 5, 6], index=0)
         
-        with st.form("history_form", clear_on_submit=False):
-            records_to_add = []
-            for i in range(num_pest):
-                st.markdown(f"<p style='color:#1b5e20; font-size:20px; font-weight:900; margin-top:15px;'>🧪 약제 {i+1} 상세정보</p>", unsafe_allow_html=True)
-                
-                sel_name = st.selectbox(f"상품명 (검색/선택) - 약제 {i+1}", options=[""] + pesticide_list, key=f"p_name_{i}")
-                
-                d_type, d_moa, d_size, d_pest, d_family = "", "", "", "", ""
-                if sel_name:
-                    db_row = df_database[df_database['상품명'] == sel_name]
-                    if not db_row.empty:
-                        r = db_row.iloc[0]
-                        d_type, d_moa, d_size, d_pest, d_family = str(r.get('종류','')), str(r.get('작용기작','')), str(r.get('규격','')), str(r.get('적용병해충','')), str(r.get('계통',''))
-                        
-                col_p1, col_p2, col_p3 = st.columns(3)
-                with col_p1: p_type = st.text_input(f"약제종류", value=d_type, key=f"p_type_{i}")
-                with col_p2: p_moa = st.text_input(f"작용기작", value=d_moa, key=f"p_moa_{i}")
-                with col_p3: p_size = st.text_input(f"규격", value=d_size, key=f"p_size_{i}")
-                
-                col_p4, col_p5, col_p6, col_p7 = st.columns(4)
-                with col_p4: p_qty = st.text_input(f"수량", value="1", key=f"p_qty_{i}")
-                with col_p5: p_pest = st.text_input(f"적용병해충", value=d_pest, key=f"p_pest_{i}")
-                with col_p6: p_family = st.text_input(f"계통", value=d_family, key=f"p_family_{i}")
-                with col_p7: pass 
-                
-                st.markdown("<hr style='margin: 10px 0; border-style: dashed; border-color: #a5d6a7;'>", unsafe_allow_html=True)
-                records_to_add.append({"name": sel_name, "type": p_type, "moa": p_moa, "size": p_size, "qty": p_qty, "pest": p_pest, "family": p_family})
-                
-            if st.form_submit_button("💾 입력한 방제 기록 일괄 저장하기", type="primary"):
-                valid = True
-                for idx, rec in enumerate(records_to_add):
-                    if not rec['name']: st.error(f"⚠️ 약제 {idx+1}의 상품명을 선택하거나 검색해 주세요."); valid = False; break
-                
-                if valid:
-                    weekdays_kr = ['월', '화', '수', '목', '금', '토', '일']
-                    dt_str = h_date.strftime(f"%Y년 %m월 %d일({weekdays_kr[h_date.weekday()]})")
-                    time_str = h_time.strftime("%H:%M")
+        # 💡 개선 포인트: st.form 제거 및 실시간 자동완성 반영
+        st.markdown("<div style='border: 3px solid #ffb74d; border-radius: 15px; padding: 25px; box-shadow: 0px 6px 15px rgba(255,183,77,0.15); margin-bottom: 15px;'>", unsafe_allow_html=True)
+        
+        records_to_add = []
+        for i in range(num_pest):
+            st.markdown(f"<p style='color:#1b5e20; font-size:20px; font-weight:900; margin-top:15px;'>🧪 약제 {i+1} 상세정보</p>", unsafe_allow_html=True)
+            
+            # 약제명 선택 시 화면 새로고침되며 아래 로직 즉시 실행
+            sel_name = st.selectbox(f"상품명 (검색/선택) - 약제 {i+1}", options=[""] + pesticide_list, key=f"p_name_{i}")
+            
+            d_type, d_moa, d_size, d_pest, d_family = "", "", "", "", ""
+            if sel_name:
+                db_row = df_database[df_database['상품명'] == sel_name]
+                if not db_row.empty:
+                    r = db_row.iloc[0]
+                    d_type, d_moa, d_size, d_pest, d_family = str(r.get('종류','')), str(r.get('작용기작','')), str(r.get('규격','')), str(r.get('적용병해충','')), str(r.get('계통',''))
                     
-                    new_dfs = []
-                    for rec in records_to_add:
-                        new_dfs.append(pd.DataFrame([{
-                            "방제일자": dt_str, "방제시작": time_str, "작물명": h_crop, "총 살포량": f"{h_vol} {h_unit}",
-                            "약제종류": rec['type'], "상품명": rec['name'], "작용기작": rec['moa'], "규격": rec['size'],
-                            "수량": rec['qty'], "적용병해충": rec['pest'], "계통": rec['family'], "메모": h_memo
-                        }]))
-                    
-                    st.session_state.spray_history = pd.concat([st.session_state.spray_history] + new_dfs, ignore_index=True)
-                    st.success("✅ 혼용 방제 기록이 한 번에 깔끔하게 저장되었습니다!")
-                    st.rerun()
+            col_p1, col_p2, col_p3 = st.columns(3)
+            with col_p1: p_type = st.text_input(f"약제종류", value=d_type, key=f"p_type_{i}")
+            with col_p2: p_moa = st.text_input(f"작용기작", value=d_moa, key=f"p_moa_{i}")
+            with col_p3: p_size = st.text_input(f"규격", value=d_size, key=f"p_size_{i}")
+            
+            col_p4, col_p5, col_p6, col_p7 = st.columns(4)
+            with col_p4: p_qty = st.text_input(f"수량", value="1", key=f"p_qty_{i}")
+            with col_p5: p_pest = st.text_input(f"적용병해충", value=d_pest, key=f"p_pest_{i}")
+            with col_p6: p_family = st.text_input(f"계통", value=d_family, key=f"p_family_{i}")
+            with col_p7: pass 
+            
+            st.markdown("<hr style='margin: 10px 0; border-style: dashed; border-color: #a5d6a7;'>", unsafe_allow_html=True)
+            records_to_add.append({"name": sel_name, "type": p_type, "moa": p_moa, "size": p_size, "qty": p_qty, "pest": p_pest, "family": p_family})
+            
+        if st.button("💾 입력한 방제 기록 일괄 저장하기", type="primary"):
+            valid = True
+            for idx, rec in enumerate(records_to_add):
+                if not rec['name']: st.error(f"⚠️ 약제 {idx+1}의 상품명을 선택하거나 검색해 주세요."); valid = False; break
+            
+            if valid:
+                weekdays_kr = ['월', '화', '수', '목', '금', '토', '일']
+                dt_str = h_date.strftime(f"%Y년 %m월 %d일({weekdays_kr[h_date.weekday()]})")
+                time_str = h_time.strftime("%H:%M")
+                
+                new_dfs = []
+                for rec in records_to_add:
+                    new_dfs.append(pd.DataFrame([{
+                        "방제일자": dt_str, "방제시작": time_str, "작물명": h_crop, "총 살포량": f"{h_vol} {h_unit}",
+                        "약제종류": rec['type'], "상품명": rec['name'], "작용기작": rec['moa'], "규격": rec['size'],
+                        "수량": rec['qty'], "적용병해충": rec['pest'], "계통": rec['family'], "메모": h_memo
+                    }]))
+                
+                st.session_state.spray_history = pd.concat([st.session_state.spray_history] + new_dfs, ignore_index=True)
+                st.success("✅ 혼용 방제 기록이 한 번에 깔끔하게 저장되었습니다!")
+                st.rerun()
+                
+        st.markdown("</div>", unsafe_allow_html=True)
 
 # ----------------------------------------
-# 새로 추가된 병충해 찾기 (AI 판독)
+# 💡 수정 포인트: 병충해 찾기 (카메라 삭제, 파일 업로드 전용)
 # ----------------------------------------
 elif menu == "병충해 찾기":
     st.subheader("📸 AI 병해충 사진 판독")
-    st.markdown("과수원에서 발견한 병해충 의심 사진을 업로드하거나 직접 촬영해 주세요.")
+    st.markdown("과수원에서 발견한 병해충 의심 사진을 업로드해 주세요.")
     
-    col_upload, col_camera = st.columns(2)
-    with col_upload:
-        uploaded_files = st.file_uploader("이미지 업로드 (최대 5장)", type=["png", "jpg", "jpeg"], accept_multiple_files=True)
-        if len(uploaded_files) > 5:
-            st.warning("사진은 최대 5장까지 분석 가능합니다. 초과된 사진은 제외됩니다.")
-            uploaded_files = uploaded_files[:5]
-    with col_camera:
-        camera_image = st.camera_input("또는 카메라로 직접 촬영")
+    uploaded_files = st.file_uploader("이미지 업로드 (최대 5장)", type=["png", "jpg", "jpeg"], accept_multiple_files=True)
+    
+    if uploaded_files and len(uploaded_files) > 5:
+        st.warning("사진은 최대 5장까지 분석 가능합니다. 초과된 사진은 제외됩니다.")
+        uploaded_files = uploaded_files[:5]
 
-    # 입력된 이미지 취합
     images_to_analyze = uploaded_files if uploaded_files else []
-    if camera_image:
-        images_to_analyze.append(camera_image)
 
     if images_to_analyze:
         st.success(f"✅ 총 {len(images_to_analyze)}장의 사진이 입력되었습니다.")
         
         if st.button("🚀 AI 판독 시작", type="primary"):
             with st.spinner("AI가 사진의 유효성을 검사하고 판독 중입니다..."):
-                time.sleep(2) # AI 분석 지연시간 시뮬레이션
+                time.sleep(2) 
                 
-                # 1) 유효성 검사 (가상 로직)
                 is_valid = all(img.size > 0 for img in images_to_analyze)
                 
                 if not is_valid:
                     st.error("🚨 [사진판독 불가] 입력된 사진의 화질이 너무 낮거나 손상되었습니다. 다시 촬영해 주세요.")
                 else:
-                    # 2) 판독 결과 생성 (가상 데이터)
                     st.session_state.ai_results = [
                         {"name": "검은점무늬병", "prob": 88.5, "desc": "감귤 잎과 과실에 흑갈색 반점이 생기는 병으로, 장마철 비산되는 포자에 의해 주로 감염됩니다."},
                         {"name": "더뎅이병", "prob": 35.2, "desc": "주로 봄철 새순이나 어린 과실에 코르크화된 돌기가 생기는 병입니다."},
                         {"name": "볼록총채벌레 피해", "prob": 12.8, "desc": "개화기~유과기에 발생하여 과실 표면에 은백색 또는 회갈색의 흉터를 남깁니다."}
                     ]
                     
-    # 3) 결과 출력
     if 'ai_results' in st.session_state and images_to_analyze:
         st.markdown("<hr style='margin: 15px 0;'>", unsafe_allow_html=True)
         st.markdown("### 🔍 AI 판독 결과 (가능성 높은 3가지)")
@@ -451,7 +445,6 @@ elif menu == "병충해 찾기":
         cols = st.columns(3)
         for i, res in enumerate(st.session_state.ai_results):
             with cols[i]:
-                # 결과 카드 UI
                 st.markdown(f"""
                     <div style='text-align:center; padding:15px; border:2px solid #ffcc80; border-radius:12px; background-color:#fff8e1; margin-bottom:10px;'>
                         <h3 style='color:#e65100; margin:0 0 5px 0;'>{res['name']}</h3>
@@ -459,11 +452,9 @@ elif menu == "병충해 찾기":
                     </div>
                 """, unsafe_allow_html=True)
                 
-                # 4) 선택 시 팝업 호출
                 if st.button(f"상세 정보 보기 👆", key=f"btn_ai_{i}", use_container_width=True):
                     show_pest_popup(res['name'], res['prob'], res['desc'])
         
-        # 유의사항 출력
         st.markdown("<br>", unsafe_allow_html=True)
         st.error("⚠️ **유의사항:** AI 정밀판독 결과이나 오류가 있을 수 있습니다. 최종 방제 결정 전 전문가의 진단을 참고하시기 바랍니다.")
 
