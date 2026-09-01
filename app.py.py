@@ -1,6 +1,8 @@
 # ==========================================
-# 📌 버전: 20.2 | 수정일시: 2026.09.01
-# 📌 주요 수정내용: 모바일 총살포량 1줄 배열 개선, 검색 결과 없을 시 안내 메시지 추가
+# 📌 버전: 20.3 | 수정일시: 2026.09.01
+# 📌 주요 수정내용: 
+#    1. 다크 모드 시 작용기작/AI 결과 카드 글자색 식별 불가 현상 수정 (CSS 클래스 적용)
+#    2. AI 병해충 판독 시 업로드된 사진 썸네일(작은 이미지) 표시 기능 추가
 # ==========================================
 
 import streamlit as st
@@ -37,7 +39,7 @@ if 'active_menu' not in st.session_state:
     st.session_state.active_menu = "내가 필요한 농약 찾기"
 
 # ==========================================
-# 🎨 UI 디자인 20.0 (CSS 스타일)
+# 🎨 UI 디자인 20.3 (CSS 스타일)
 # ==========================================
 st.markdown("""
     <style>
@@ -90,6 +92,16 @@ st.markdown("""
     .moa-inner.desc { background-color: white; border-left: 5px solid #e65100; color: #333;}
     .moa-inner.detail { background-color: #e8f5e9; border-left: 5px solid #2e7d32; color: #333;}
 
+    /* 💡 다크모드 대응을 위한 결과 카드 CSS 클래스 정의 */
+    .moa-result-card { background-color: #f1f8e9; border-left: 5px solid #66bb6a; border-radius: 8px; padding: 15px; margin-bottom: 10px; color: #333; }
+    .moa-result-card h4 { color: #2e7d32; margin: 0 0 5px 0; }
+    .moa-result-card p.title { margin: 0 0 8px 0; font-size: 14px; font-weight: bold; color: #333; }
+    .moa-result-card p.desc { margin: 0; color: #e65100; font-weight: bold; }
+    
+    .ai-result-card { text-align: center; padding: 15px; border: 2px solid #ffcc80; border-radius: 12px; background-color: #fff8e1; margin-bottom: 10px; color: #333; }
+    .ai-result-card h3 { color: #e65100; margin: 0 0 5px 0; }
+    .ai-result-card p { font-size: 22px; font-weight: 900; margin: 0; color: #2e7d32; }
+
     @media (prefers-color-scheme: dark) {
         input[type="text"], input[type="password"], div[data-baseweb="select"] > div, div[data-testid="stDateInput"] > div, div[data-testid="stTimeInput"] > div, textarea {
             background-color: #3b3b3b !important; border: 1px solid #555555 !important; color: #f1f1f1 !important;
@@ -102,6 +114,15 @@ st.markdown("""
         .card-moa { background-color: #2c3e30; border-color: #4CAF50; }
         .moa-inner.type, .moa-inner.desc, .moa-inner.detail { background-color: #383838; color: #e0e0e0; }
         h4, h3, h2, p { color: #e0e0e0 !important; }
+        
+        /* 다크모드 전용 카드 색상 반전 처리 */
+        .moa-result-card { background-color: #2c3e30; color: #e0e0e0; }
+        .moa-result-card h4 { color: #a5d6a7; }
+        .moa-result-card p.title { color: #e0e0e0; }
+        .moa-result-card p.desc { color: #ffb74d; }
+        .ai-result-card { background-color: #3e2723; border-color: #ffb74d; color: #e0e0e0; }
+        .ai-result-card h3 { color: #ffb74d; }
+        .ai-result-card p { color: #a5d6a7; }
     }
 
     @media (max-width: 768px) {
@@ -114,7 +135,6 @@ st.markdown("""
         button[kind="secondaryFormSubmit"], button[kind="primary"] { font-size: 18px !important; padding: 10px !important; margin-top: 10px !important; }
         .custom-card { padding: 15px !important; }
         
-        /* 💡 수정사항 3: 모바일 총살포량 & 단위 1줄 강제 통합 로직 (CSS 최적화) */
         div[data-testid="stHorizontalBlock"]:has(input[placeholder="예: 1000"]) {
             display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important; gap: 8px !important;
         }
@@ -188,11 +208,12 @@ def render_moa_popup_trigger(df_current_result):
                     ntype = res.get('농약종류', '')
                     icon = "🛡️" if "살균" in ntype else ("🐛" if "살충" in ntype else ("🌿" if "제초" in ntype else "🧪"))
                     
+                    # 💡 수정사항: 다크모드 대응 CSS 클래스로 교체 (글자 묻힘 현상 해결)
                     st.markdown(f"""
-                    <div style='background-color: #f1f8e9; border-left: 5px solid #66bb6a; border-radius: 8px; padding: 15px; margin-bottom:10px;'>
-                        <h4 style='color: #2e7d32; margin:0 0 5px 0;'>{code} <span style='font-size: 14px; font-weight: normal; color: #555;'>({icon} {ntype})</span></h4>
-                        <p style='margin:0 0 8px 0; font-size:14px; font-weight:bold;'>{res.get('작용기작 구분', '')}</p>
-                        <p style='margin:0; color: #e65100; font-weight: bold;'>👉 {res.get('세부 작용기작 및 계통(성분)', '')}</p>
+                    <div class='moa-result-card'>
+                        <h4>{code} <span style='font-size: 14px; font-weight: normal; opacity: 0.8;'>({icon} {ntype})</span></h4>
+                        <p class='title'>{res.get('작용기작 구분', '')}</p>
+                        <p class='desc'>👉 {res.get('세부 작용기작 및 계통(성분)', '')}</p>
                     </div>
                     """, unsafe_allow_html=True)
                 else:
@@ -370,7 +391,6 @@ else:
             if target_col == '상품명': res = df_database[df_database[target_col].astype(str) == search_val]
             else: res = df_database[df_database[target_col].astype(str).str.contains(search_val)]
             
-            # 💡 수정사항 2: DB에 없을 경우 안내 메시지 출력
             if res.empty:
                 st.error("찾을 수 없습니다. 다시 입력해주세요!")
             else:
@@ -517,6 +537,15 @@ else:
         if images_to_analyze:
             st.success(f"✅ 총 {len(images_to_analyze)}장의 사진이 입력되었습니다.")
             
+            # 💡 수정사항: 업로드된 사진들을 나란히 썸네일 형태로 미리보기 제공
+            st.markdown("<p style='font-size: 15px; font-weight: bold; margin-bottom: 5px;'>업로드된 사진 미리보기:</p>", unsafe_allow_html=True)
+            cols_img = st.columns(len(images_to_analyze))
+            for idx, img_file in enumerate(images_to_analyze):
+                with cols_img[idx]:
+                    st.image(img_file, use_container_width=True)
+            
+            st.markdown("<br>", unsafe_allow_html=True)
+            
             if st.button("🚀 AI 판독 시작", type="primary"):
                 with st.spinner("AI가 사진의 유효성을 검사하고 판독 중입니다..."):
                     time.sleep(2) 
@@ -539,10 +568,11 @@ else:
             cols = st.columns(3)
             for i, res in enumerate(st.session_state.ai_results):
                 with cols[i]:
+                    # 💡 수정사항: 다크모드 대응을 위한 CSS 클래스(.ai-result-card) 적용
                     st.markdown(f"""
-                        <div style='text-align:center; padding:15px; border:2px solid #ffcc80; border-radius:12px; background-color:#fff8e1; margin-bottom:10px;'>
-                            <h3 style='color:#e65100; margin:0 0 5px 0;'>{res['name']}</h3>
-                            <p style='font-size:22px; font-weight:900; margin:0; color:#2e7d32;'>{res['prob']}%</p>
+                        <div class='ai-result-card'>
+                            <h3>{res['name']}</h3>
+                            <p>{res['prob']}%</p>
                         </div>
                     """, unsafe_allow_html=True)
                     
