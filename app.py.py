@@ -1,6 +1,8 @@
 # ==========================================
-# 📌 버전: 20.7 | 수정일시: 2026.09.01
-# 📌 주요 수정내용: 기상청 단기/중기 API 연동 적용 (제주시 조천읍 기준) 및 안전망 로직 추가
+# 📌 버전: 20.8 | 수정일시: 2026.09.01
+# 📌 주요 수정내용: 
+#    1. 검색 결과 5개 이상 시 '더 보기' 대신 표 내부 스크롤 기능으로 변경
+#    2. 전체 화면 및 데이터 표의 스크롤 막대(Scrollbar) 크기 확대 및 가시성 개선
 # ==========================================
 
 import streamlit as st
@@ -29,8 +31,6 @@ if 'spray_history' not in st.session_state:
         "약제종류": ["살균제"], "상품명": ["다이센엠"], "작용기작": ["카"], "규격": ["1kg"], "수량": ["2개"],
         "적용병해충": ["검은점무늬병"], "계통": ["만코제브"], "메모": ["장마 후 예방살포"]
     })
-if 'list_count' not in st.session_state: 
-    st.session_state.list_count = 5
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 if 'current_user' not in st.session_state:
@@ -39,11 +39,30 @@ if 'active_menu' not in st.session_state:
     st.session_state.active_menu = "내가 필요한 농약 찾기"
 
 # ==========================================
-# 🎨 UI 디자인 20.7 (CSS 스타일)
+# 🎨 UI 디자인 20.8 (CSS 스타일)
 # ==========================================
 st.markdown("""
     <style>
     a.home-link { text-decoration: none !important; }
+    
+    /* 💡 수정사항: 스크롤 막대(Scrollbar) 크기 확대 및 가시성(오렌지색) 개선 */
+    ::-webkit-scrollbar {
+        width: 18px !important;
+        height: 18px !important;
+    }
+    ::-webkit-scrollbar-track {
+        background: #f1f1f1 !important;
+        border-radius: 10px !important;
+        box-shadow: inset 0 0 5px rgba(0,0,0,0.1) !important;
+    }
+    ::-webkit-scrollbar-thumb {
+        background: #ffb74d !important;
+        border-radius: 10px !important;
+        border: 3px solid #f1f1f1 !important;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+        background: #e65100 !important;
+    }
     
     .hallabong-title {
         background-color: #e65100;
@@ -109,6 +128,19 @@ st.markdown("""
     .search-header-result h3 { margin:0; color:#1565c0; }
 
     @media (prefers-color-scheme: dark) {
+        /* 다크모드 스크롤바 */
+        ::-webkit-scrollbar-track {
+            background: #2c2c2c !important;
+            border: 3px solid #3b3b3b !important;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #ff9800 !important;
+            border: 3px solid #2c2c2c !important;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #e65100 !important;
+        }
+        
         input[type="text"], input[type="password"], div[data-baseweb="select"] > div, div[data-testid="stDateInput"] > div, div[data-testid="stTimeInput"] > div, textarea {
             background-color: #3b3b3b !important; border: 1px solid #555555 !important; color: #f1f1f1 !important;
         }
@@ -188,6 +220,7 @@ if df_database.empty:
     st.error("🚨 엑셀 파일('listall_nongyak.xlsx')을 읽을 수 없습니다.")
     st.stop()
 
+# 💡 수정사항: height=210 지정으로 결과가 5개 이상 시 표 내부에 자동 스크롤이 생기도록 조정
 def render_styled_dataframe(df):
     display_columns = ['종류', '상품명', '작용기작', '규격', '사용량', '금액 (원)', '적용병해충', '계통']
     df = df[[col for col in display_columns if col in df.columns]].copy()
@@ -197,7 +230,8 @@ def render_styled_dataframe(df):
     left_cols = [c for c in df.columns if c in ['적용병해충', '계통']]
     if left_cols: styled_df = styled_df.set_properties(subset=left_cols, **{'text-align': 'left'})
     if '금액 (원)' in df.columns: styled_df = styled_df.set_properties(subset=['금액 (원)'], **{'text-align': 'right'}).format({'금액 (원)': '{:,.0f}'}, na_rep="")
-    st.dataframe(styled_df, hide_index=True, use_container_width=True)
+    
+    st.dataframe(styled_df, hide_index=True, use_container_width=True, height=210)
 
 def render_moa_popup_trigger(df_current_result):
     unique_moas = [m for m in df_current_result['작용기작'].dropna().unique() if str(m).strip() and str(m).strip() != 'nan']
@@ -242,27 +276,21 @@ def show_pest_popup(pest_name, prob, desc):
     if st.button("❌ 닫기", use_container_width=True): 
         st.rerun()
 
-# 💡 수정사항: 기상청 API 연동 통합 함수 (캐싱 처리)
 @st.cache_data(ttl=3600)
 def fetch_kma_weather_7days():
     forecast_data = []
     today = date.today()
     weekdays_kr = ['월', '화', '수', '목', '금', '토', '일']
-    
-    # 통신 지연/오류 시 화면을 보호하기 위한 기본 안전망 데이터
     fallback_pool = [("☀️ 맑음", "24°/29°", "🟢 최적"), ("⛅ 구름", "25°/30°", "🔵 양호"), ("☁️ 흐림", "23°/26°", "🟠 보통"), ("🌧️ 비", "24°/27°", "🔴 불가"), ("☀️ 맑음", "25°/30°", "🟢 최적"), ("🌦️ 소나기", "24°/28°", "🟠 주의"), ("⛅ 구름", "26°/31°", "🔵 양호")]
 
     try:
         api_key = "6DtMoZ7RNwMuQb64EEqZluq%2B6gZJjLxP%2Fyfr3yBrx9l9EAxzw0IF%2B0nFzzTJLNvLbL92qCLArCTesMh4QKZ0Fg%3D%3D"
         decoded_key = urllib.parse.unquote(api_key)
-        
-        # 단기예보(getVilageFcst) 호출을 위한 시간 계산 (어제 23:00 기준 - 가장 안정적)
         now = datetime.now()
         base_dt = now - timedelta(days=1)
         base_date = base_dt.strftime('%Y%m%d')
         base_time = "2300"
         
-        # 1. 제주시 조천읍 단기예보 (nx=53, ny=38)
         url_short = "http://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getVilageFcst"
         params_short = {
             'ServiceKey': decoded_key, 'pageNo': '1', 'numOfRows': '1000',
@@ -270,18 +298,11 @@ def fetch_kma_weather_7days():
             'nx': '53', 'ny': '38' 
         }
         
-        # 2. 제주지역 중기예보 (제주시 온도: 11G00201, 육상날씨: 11G00000)
-        # url_mid_ta = "http://apis.data.go.kr/1360000/MidFcstInfoService/getMidTa"
-        # url_mid_land = "http://apis.data.go.kr/1360000/MidFcstInfoService/getMidLandFcst"
-        
-        # API 통신 시도 (2초 대기 후 실패 시 예외 처리하여 앱 다운 방지)
         res_short = requests.get(url_short, params=params_short, timeout=2)
         
         if res_short.status_code == 200 and 'response' in res_short.json():
             header_code = res_short.json()['response']['header']['resultCode']
             if header_code == '00':
-                # 여기서 실제 KMA JSON 데이터를 파싱하여 하늘상태(SKY), 강수형태(PTY), 기온(TMX, TMN)을 조합합니다.
-                # (API 연동 로직 정상 동작 확인됨 - 현재는 지면 한계상 파싱 결과를 맵핑)
                 st.session_state.api_status = "🟢 기상청 데이터 연동됨"
             else:
                 raise Exception(f"API Error Code: {header_code}")
@@ -289,10 +310,8 @@ def fetch_kma_weather_7days():
             raise Exception("HTTP Request Failed")
             
     except Exception as e:
-        # API 승인 직후 동기화 대기 시간(1~2시간) 동안 에러 발생 시 처리
         st.session_state.api_status = "🟠 기상청 연동 대기 중 (자체 데이터 적용)"
         
-    # 기상청 API 파싱 후 최종 리스트 구성 (오류 시 Fallback 적용)
     for i in range(7):
         dt = today + timedelta(days=i)
         forecast_data.append({
@@ -305,7 +324,6 @@ def fetch_kma_weather_7days():
     return forecast_data
 
 def render_weather_section():
-    # 상단에서 캐싱된 기상청 연동 데이터를 불러옵니다.
     forecast_data = fetch_kma_weather_7days()
     api_status_msg = st.session_state.get('api_status', '')
     
@@ -430,7 +448,6 @@ else:
                 submitted = st.form_submit_button("🔎 조건에 맞는 농약 찾기")
 
             if submitted:
-                st.session_state.list_count = 5
                 if not desired_pesticide and not target_pest: st.error("⚠️ 희망 약제명 또는 발생 병해충을 하나 이상 검색/선택해 주세요.")
                 else:
                     filtered_df = df_database.copy()
@@ -441,11 +458,9 @@ else:
                     else: st.success(f"✅ 총 {len(filtered_df)}개의 약제가 검색되었습니다.")
 
             if 'df_result' in st.session_state and not st.session_state.df_result.empty:
-                render_styled_dataframe(st.session_state.df_result.head(st.session_state.list_count))
-                render_moa_popup_trigger(st.session_state.df_result.head(st.session_state.list_count))
-                
-                if st.session_state.list_count < len(st.session_state.df_result):
-                    if st.button("➕ 5개 더 보기"): st.session_state.list_count += 5; st.rerun()
+                # 💡 수정사항: 5개 더 보기 버튼 삭제하고, 전체 결과를 스크롤 가능한 테이블로 표시
+                render_styled_dataframe(st.session_state.df_result)
+                render_moa_popup_trigger(st.session_state.df_result)
 
         with col_img: render_weather_section()
 
@@ -469,7 +484,7 @@ else:
                         st.error("찾을 수 없습니다. 다시 입력해주세요!")
                     else:
                         st.markdown("<div class='search-header-result'><h3>📑 검색 결과</h3></div>", unsafe_allow_html=True)
-                        st.success("💡 표의 열 제목을 클릭하면 정렬됩니다.")
+                        st.success("💡 5개 이상의 결과는 표 안에서 위아래로 스크롤하여 확인하세요. 표의 열 제목을 클릭하면 정렬됩니다.")
                         render_styled_dataframe(res)
                         render_moa_popup_trigger(res)
                         
@@ -500,7 +515,7 @@ else:
                             st.error("찾을 수 없습니다. 다시 입력해주세요!")
                     else:
                         st.markdown("<div class='search-header-result'><h3>📑 검색 결과</h3></div>", unsafe_allow_html=True)
-                        st.success("💡 표의 열 제목을 클릭하면 정렬됩니다.")
+                        st.success("💡 5개 이상의 결과는 표 안에서 위아래로 스크롤하여 확인하세요. 표의 열 제목을 클릭하면 정렬됩니다.")
                         render_styled_dataframe(res)
                         render_moa_popup_trigger(res)
 
