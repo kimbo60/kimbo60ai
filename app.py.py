@@ -1,8 +1,9 @@
 # ==========================================
-# 📌 버전: 20.3 | 수정일시: 2026.09.01
+# 📌 버전: 20.5 | 수정일시: 2026.09.01
 # 📌 주요 수정내용: 
-#    1. 다크 모드 시 작용기작/AI 결과 카드 글자색 식별 불가 현상 수정 (CSS 클래스 적용)
-#    2. AI 병해충 판독 시 업로드된 사진 썸네일(작은 이미지) 표시 기능 추가
+#    1. 농약명/병해충명 찾기에서 불필요한 안내 메시지 삭제
+#    2. 검색 입력창과 결과창의 시각적 분리 및 전용 헤더 디자인 적용
+#    3. 화면의 가로 너비를 중앙 집중형으로 조정하여 가독성 개선
 # ==========================================
 
 import streamlit as st
@@ -39,7 +40,7 @@ if 'active_menu' not in st.session_state:
     st.session_state.active_menu = "내가 필요한 농약 찾기"
 
 # ==========================================
-# 🎨 UI 디자인 20.3 (CSS 스타일)
+# 🎨 UI 디자인 20.5 (CSS 스타일)
 # ==========================================
 st.markdown("""
     <style>
@@ -92,7 +93,6 @@ st.markdown("""
     .moa-inner.desc { background-color: white; border-left: 5px solid #e65100; color: #333;}
     .moa-inner.detail { background-color: #e8f5e9; border-left: 5px solid #2e7d32; color: #333;}
 
-    /* 💡 다크모드 대응을 위한 결과 카드 CSS 클래스 정의 */
     .moa-result-card { background-color: #f1f8e9; border-left: 5px solid #66bb6a; border-radius: 8px; padding: 15px; margin-bottom: 10px; color: #333; }
     .moa-result-card h4 { color: #2e7d32; margin: 0 0 5px 0; }
     .moa-result-card p.title { margin: 0 0 8px 0; font-size: 14px; font-weight: bold; color: #333; }
@@ -101,6 +101,14 @@ st.markdown("""
     .ai-result-card { text-align: center; padding: 15px; border: 2px solid #ffcc80; border-radius: 12px; background-color: #fff8e1; margin-bottom: 10px; color: #333; }
     .ai-result-card h3 { color: #e65100; margin: 0 0 5px 0; }
     .ai-result-card p { font-size: 22px; font-weight: 900; margin: 0; color: #2e7d32; }
+    
+    /* 💡 검색 헤더 CSS 영역 (라이트모드) */
+    .search-header-pest { background: linear-gradient(to right, #f1f8e9, transparent); padding: 15px 20px; border-left: 5px solid #4caf50; border-radius: 8px; margin-bottom: 15px; }
+    .search-header-pest h3 { margin:0; color:#2e7d32; }
+    .search-header-bug { background: linear-gradient(to right, #fff8e1, transparent); padding: 15px 20px; border-left: 5px solid #ffb300; border-radius: 8px; margin-bottom: 15px; }
+    .search-header-bug h3 { margin:0; color:#f57f17; }
+    .search-header-result { background: linear-gradient(to right, #e3f2fd, transparent); padding: 15px 20px; border-left: 5px solid #2196f3; border-radius: 8px; margin-bottom: 15px; }
+    .search-header-result h3 { margin:0; color:#1565c0; }
 
     @media (prefers-color-scheme: dark) {
         input[type="text"], input[type="password"], div[data-baseweb="select"] > div, div[data-testid="stDateInput"] > div, div[data-testid="stTimeInput"] > div, textarea {
@@ -115,7 +123,6 @@ st.markdown("""
         .moa-inner.type, .moa-inner.desc, .moa-inner.detail { background-color: #383838; color: #e0e0e0; }
         h4, h3, h2, p { color: #e0e0e0 !important; }
         
-        /* 다크모드 전용 카드 색상 반전 처리 */
         .moa-result-card { background-color: #2c3e30; color: #e0e0e0; }
         .moa-result-card h4 { color: #a5d6a7; }
         .moa-result-card p.title { color: #e0e0e0; }
@@ -123,6 +130,14 @@ st.markdown("""
         .ai-result-card { background-color: #3e2723; border-color: #ffb74d; color: #e0e0e0; }
         .ai-result-card h3 { color: #ffb74d; }
         .ai-result-card p { color: #a5d6a7; }
+        
+        /* 💡 검색 헤더 CSS 영역 (다크모드) */
+        .search-header-pest { background: linear-gradient(to right, #1b5e20, transparent); }
+        .search-header-pest h3 { color: #a5d6a7; }
+        .search-header-bug { background: linear-gradient(to right, #4e342e, transparent); }
+        .search-header-bug h3 { color: #ffcc80; }
+        .search-header-result { background: linear-gradient(to right, #0d47a1, transparent); }
+        .search-header-result h3 { color: #90caf9; }
     }
 
     @media (max-width: 768px) {
@@ -192,7 +207,7 @@ def render_moa_popup_trigger(df_current_result):
     if unique_moas:
         st.markdown("<p style='font-size: 16px; font-weight: 800; color: #2e7d32; margin-top: 10px; margin-bottom: 5px;'>🔬 검색된 약제의 작용기작 상세정보 확인</p>", unsafe_allow_html=True)
         
-        selected_moa = st.selectbox("아래에서 작용기작 코드를 선택하세요:", options=["선택 안 함"] + unique_moas, index=0)
+        selected_moa = st.selectbox("아래에서 작용기작 코드를 선택하세요:", options=["선택 안 함"] + unique_moas, index=0, label_visibility="collapsed")
         
         if selected_moa != "선택 안 함":
             df_moa = load_moa_data()
@@ -208,7 +223,6 @@ def render_moa_popup_trigger(df_current_result):
                     ntype = res.get('농약종류', '')
                     icon = "🛡️" if "살균" in ntype else ("🐛" if "살충" in ntype else ("🌿" if "제초" in ntype else "🧪"))
                     
-                    # 💡 수정사항: 다크모드 대응 CSS 클래스로 교체 (글자 묻힘 현상 해결)
                     st.markdown(f"""
                     <div class='moa-result-card'>
                         <h4>{code} <span style='font-size: 14px; font-weight: normal; opacity: 0.8;'>({icon} {ntype})</span></h4>
@@ -316,7 +330,7 @@ else:
     # ----------------------------------------
     # 메인 메뉴 렌더링
     # ----------------------------------------
-    menus = ["내가 필요한 농약 찾기", "농약명으로 찾기", "병해충명으로 찾기", "작용기작 찾기", "나의 방제이력", "병충해 분석", "정보교환마당"]
+    menus = ["내가 필요한 농약 찾기", "농약명으로 찾기", "병해충명으로 찾기", "작용기작 찾기", "나의 방제이력", "병해충 분석", "정보교환마당"]
     menu_idx = menus.index(st.session_state.active_menu) if st.session_state.active_menu in menus else 0
     selected_menu = st.radio("메인 메뉴", menus, index=menu_idx, horizontal=True, label_visibility="collapsed")
     
@@ -376,29 +390,35 @@ else:
     # 메뉴 2 & 3: 농약명/병해충명으로 찾기
     # ----------------------------------------
     elif menu in ["농약명으로 찾기", "병해충명으로 찾기"]:
-        col_limit, _ = st.columns([7, 3])
-        with col_limit:
+        # 💡 전체 화면보다 좁게 가로 사이즈 조정 및 중앙 정렬 (1.5 : 7 : 1.5 비율)
+        _, col_center, _ = st.columns([1.5, 7, 1.5])
+        
+        with col_center:
+            # 1. 검색 입력 영역 
             if menu == "농약명으로 찾기":
-                st.subheader("🔍 농약명 검색")
-                search_val = st.selectbox("농약 상품명 선택/입력:", options=pesticide_list, index=None, placeholder="찾으시는 농약명을 검색하세요")
+                st.markdown("<div class='search-header-pest'><h3>🔍 농약명 검색</h3></div>", unsafe_allow_html=True)
+                search_val = st.selectbox("농약 상품명 선택/입력:", options=pesticide_list, index=None, placeholder="찾으시는 농약명을 검색하세요", label_visibility="collapsed")
                 target_col = '상품명'
             else:
-                st.subheader("🐛 병해충명 검색")
-                search_val = st.selectbox("병해충명 선택/입력:", options=pest_list, index=None, placeholder="찾으시는 병해충명을 검색하세요")
+                st.markdown("<div class='search-header-bug'><h3>🐛 병해충명 검색</h3></div>", unsafe_allow_html=True)
+                search_val = st.selectbox("병해충명 선택/입력:", options=pest_list, index=None, placeholder="찾으시는 병해충명을 검색하세요", label_visibility="collapsed")
                 target_col = '적용병해충'
                 
-        if search_val and search_val.strip():
-            if target_col == '상품명': res = df_database[df_database[target_col].astype(str) == search_val]
-            else: res = df_database[df_database[target_col].astype(str).str.contains(search_val)]
+            # 검색창과 결과창의 시각적 분리선
+            st.markdown("<hr style='border: 1px dashed #cccccc; margin: 30px 0;'>", unsafe_allow_html=True)
             
-            if res.empty:
-                st.error("찾을 수 없습니다. 다시 입력해주세요!")
-            else:
-                st.success("💡 표의 열 제목을 클릭하면 정렬됩니다.")
-                render_styled_dataframe(res)
-                render_moa_popup_trigger(res)
-        else:
-            st.info("👆 위 검색창에 명칭을 치시면 해당 이름만 목록에 나타납니다.")
+            # 2. 검색 결과 영역
+            if search_val and search_val.strip():
+                if target_col == '상품명': res = df_database[df_database[target_col].astype(str) == search_val]
+                else: res = df_database[df_database[target_col].astype(str).str.contains(search_val)]
+                
+                if res.empty:
+                    st.error("찾을 수 없습니다. 다시 입력해주세요!")
+                else:
+                    st.markdown("<div class='search-header-result'><h3>📑 검색 결과</h3></div>", unsafe_allow_html=True)
+                    st.success("💡 표의 열 제목을 클릭하면 정렬됩니다.")
+                    render_styled_dataframe(res)
+                    render_moa_popup_trigger(res)
 
     # ----------------------------------------
     # 메뉴 4: 작용기작 찾기
@@ -520,9 +540,9 @@ else:
             st.markdown("</div>", unsafe_allow_html=True)
 
     # ----------------------------------------
-    # 메뉴 6: 병충해 분석
+    # 메뉴 6: 병해충 분석
     # ----------------------------------------
-    elif menu == "병충해 분석":
+    elif menu == "병해충 분석":
         st.subheader("📸 AI 병해충 사진 판독")
         st.markdown("과수원에서 발견한 병해충 의심 사진을 업로드해 주세요.")
         
@@ -537,7 +557,6 @@ else:
         if images_to_analyze:
             st.success(f"✅ 총 {len(images_to_analyze)}장의 사진이 입력되었습니다.")
             
-            # 💡 수정사항: 업로드된 사진들을 나란히 썸네일 형태로 미리보기 제공
             st.markdown("<p style='font-size: 15px; font-weight: bold; margin-bottom: 5px;'>업로드된 사진 미리보기:</p>", unsafe_allow_html=True)
             cols_img = st.columns(len(images_to_analyze))
             for idx, img_file in enumerate(images_to_analyze):
@@ -568,7 +587,6 @@ else:
             cols = st.columns(3)
             for i, res in enumerate(st.session_state.ai_results):
                 with cols[i]:
-                    # 💡 수정사항: 다크모드 대응을 위한 CSS 클래스(.ai-result-card) 적용
                     st.markdown(f"""
                         <div class='ai-result-card'>
                             <h3>{res['name']}</h3>
