@@ -14,6 +14,7 @@ import base64
 import time
 
 # 1. 앱 기본 설정
+# 화면 테마: LIGHT MODE 전용. OS/브라우저의 dark mode를 따르지 않도록 CSS에서 강제합니다.
 st.set_page_config(page_title="내가 찾는 농약", page_icon="🍊", layout="wide")
 
 # ==========================================
@@ -108,35 +109,6 @@ st.markdown("""
     .search-header-result { background: linear-gradient(to right, #e3f2fd, transparent); padding: 15px 20px; border-left: 5px solid #2196f3; border-radius: 8px; margin-bottom: 15px; }
     .search-header-result h3 { margin:0; color:#1565c0; }
 
-    @media (prefers-color-scheme: dark) {
-        input[type="text"], input[type="password"], div[data-baseweb="select"] > div, div[data-testid="stDateInput"] > div, div[data-testid="stTimeInput"] > div, textarea {
-            background-color: #3b3b3b !important; border: 1px solid #555555 !important; color: #f1f1f1 !important;
-        }
-        div[data-testid="stForm"] { background-color: #1e1e1e !important; border-color: #555 !important; }
-        div[data-testid="stForm"] label p, div[data-testid="stExpander"] p { color: #e0e0e0 !important; }
-        .card-weather { background: linear-gradient(135deg, #424242 0%, #303030 100%); color: #e0e0e0; border-color: #555; }
-        .card-notice { background-color: #2c2c2c; color: #e0e0e0; border-color: #555; }
-        .card-qa { background-color: #2a3138; color: #e0e0e0; border-color: #555; }
-        .card-moa { background-color: #2c3e30; border-color: #4CAF50; }
-        .moa-inner.type, .moa-inner.desc, .moa-inner.detail { background-color: #383838; color: #e0e0e0; }
-        h4, h3, h2, p { color: #e0e0e0 !important; }
-        
-        .moa-result-card { background-color: #2c3e30; color: #e0e0e0; }
-        .moa-result-card h4 { color: #a5d6a7; }
-        .moa-result-card p.title { color: #e0e0e0; }
-        .moa-result-card p.desc { color: #ffb74d; }
-        .ai-result-card { background-color: #3e2723; border-color: #ffb74d; color: #e0e0e0; }
-        .ai-result-card h3 { color: #ffb74d; }
-        .ai-result-card p { color: #a5d6a7; }
-        
-        .search-header-pest { background: linear-gradient(to right, #1b5e20, transparent); }
-        .search-header-pest h3 { color: #a5d6a7; }
-        .search-header-bug { background: linear-gradient(to right, #4e342e, transparent); }
-        .search-header-bug h3 { color: #ffcc80; }
-        .search-header-result { background: linear-gradient(to right, #0d47a1, transparent); }
-        .search-header-result h3 { color: #90caf9; }
-    }
-
     @media (max-width: 768px) {
         .hallabong-title { font-size: 2rem !important; padding: 15px !important; border-radius: 12px !important; margin-bottom: 15px !important;}
         .hallabong-title img { width: 40px !important; margin-right: 8px !important; }
@@ -154,6 +126,191 @@ st.markdown("""
             width: 50% !important; min-width: 0 !important; flex: 1 1 auto !important;
         }
     }
+
+    /* =========================================================
+       LIGHT MODE ONLY + MOBILE RESPONSIVE OVERRIDES
+       ========================================================= */
+    html, body, [data-testid="stAppViewContainer"], [data-testid="stApp"] {
+        background-color: #ffffff !important;
+        color: #222222 !important;
+    }
+
+    /* Prevent dark-mode form controls from being inherited from OS/browser */
+    input, textarea, select,
+    div[data-baseweb="select"] > div,
+    div[data-testid="stDateInput"] > div,
+    div[data-testid="stTimeInput"] > div {
+        background-color: #ffffff !important;
+        color: #222222 !important;
+        border-color: #cccccc !important;
+        color-scheme: light !important;
+    }
+
+    input::placeholder, textarea::placeholder {
+        color: #777777 !important;
+        opacity: 1 !important;
+    }
+
+    /* Tables */
+    div[data-testid="stDataFrame"] {
+        width: 100% !important;
+        overflow-x: auto !important;
+    }
+
+    /* Long text should wrap rather than force the page wider */
+    .custom-card, .moa-inner, .moa-result-card, .ai-result-card,
+    .search-header-pest, .search-header-bug, .search-header-result {
+        overflow-wrap: anywhere !important;
+        word-break: keep-all;
+    }
+
+    @media (max-width: 768px) {
+        /* Overall page */
+        .block-container {
+            padding: 0.7rem 0.7rem 2rem 0.7rem !important;
+            max-width: 100% !important;
+        }
+
+        /* Header */
+        .hallabong-title {
+            font-size: 1.65rem !important;
+            line-height: 1.2 !important;
+            padding: 11px 8px !important;
+            border-radius: 12px !important;
+            margin-bottom: 10px !important;
+        }
+
+        .hallabong-title img {
+            width: 34px !important;
+            margin-right: 6px !important;
+        }
+
+        /* Main menu: allow wrapping and prevent horizontal overflow */
+        div[data-testid="stRadio"] div[role="radiogroup"] {
+            display: flex !important;
+            flex-wrap: wrap !important;
+            justify-content: center !important;
+            gap: 5px !important;
+            width: 100% !important;
+            overflow: visible !important;
+        }
+
+        div[data-testid="stRadio"] div[role="radiogroup"] label {
+            padding: 6px 8px !important;
+            border-radius: 8px !important;
+            border-width: 1px !important;
+            margin: 0 !important;
+            max-width: 100% !important;
+        }
+
+        div[data-testid="stRadio"] div[role="radiogroup"] label p {
+            font-size: 13px !important;
+            white-space: normal !important;
+            text-align: center !important;
+        }
+
+        /* Stack Streamlit columns on narrow screens where appropriate */
+        div[data-testid="stHorizontalBlock"] {
+            flex-wrap: wrap !important;
+        }
+
+        /* Forms */
+        div[data-testid="stForm"] {
+            padding: 12px !important;
+            border-radius: 10px !important;
+            border-width: 2px !important;
+        }
+
+        input[type="text"], input[type="password"],
+        div[data-baseweb="select"] span,
+        div[data-baseweb="select"] input,
+        div[data-testid="stDateInput"] input,
+        div[data-testid="stTimeInput"] input,
+        textarea {
+            font-size: 15px !important;
+            min-width: 0 !important;
+        }
+
+        /* Buttons */
+        button[kind="secondaryFormSubmit"],
+        button[kind="primary"] {
+            font-size: 17px !important;
+            padding: 9px 10px !important;
+            min-height: 44px !important;
+            width: 100% !important;
+        }
+
+        /* Cards */
+        .custom-card {
+            padding: 12px !important;
+            margin-bottom: 10px !important;
+        }
+
+        .card-weather {
+            font-size: 1rem !important;
+            line-height: 1.5 !important;
+        }
+
+        .card-notice, .card-qa {
+            min-height: auto !important;
+        }
+
+        .moa-inner {
+            padding: 12px 14px !important;
+        }
+
+        .moa-inner.detail p:last-child {
+            font-size: 20px !important;
+        }
+
+        .moa-result-card {
+            padding: 12px !important;
+        }
+
+        .ai-result-card {
+            padding: 12px !important;
+        }
+
+        .ai-result-card p {
+            font-size: 20px !important;
+        }
+
+        /* Images should never exceed the phone viewport */
+        img {
+            max-width: 100% !important;
+            height: auto !important;
+        }
+
+        /* Dataframes: keep readable; allow horizontal scrolling inside table */
+        div[data-testid="stDataFrame"] {
+            max-width: 100% !important;
+            overflow-x: auto !important;
+        }
+
+        /* Prevent long strings from creating page-wide horizontal scroll */
+        p, h1, h2, h3, h4, h5, h6, span, label, td, th {
+            overflow-wrap: anywhere !important;
+        }
+
+        /* Keep the existing volume inputs side-by-side */
+        div[data-testid="stHorizontalBlock"]:has(input[placeholder="예: 1000"]) {
+            display: flex !important;
+            flex-wrap: nowrap !important;
+            gap: 6px !important;
+        }
+
+        div[data-testid="stHorizontalBlock"]:has(input[placeholder="예: 1000"]) > div[data-testid="column"] {
+            width: 50% !important;
+            min-width: 0 !important;
+            flex: 1 1 0 !important;
+        }
+
+        /* Q&A / notice two-column area becomes one column on phones */
+        div[data-testid="stHorizontalBlock"]:has(.card-notice) {
+            flex-direction: column !important;
+        }
+    }
+
     </style>
 """, unsafe_allow_html=True)
 
