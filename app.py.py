@@ -1,9 +1,8 @@
 # ==========================================
-# 📌 버전: 20.5 | 수정일시: 2026.09.01
+# 📌 버전: 20.6 | 수정일시: 2026.09.01
 # 📌 주요 수정내용: 
-#    1. 농약명/병해충명 찾기에서 불필요한 안내 메시지 삭제
-#    2. 검색 입력창과 결과창의 시각적 분리 및 전용 헤더 디자인 적용
-#    3. 화면의 가로 너비를 중앙 집중형으로 조정하여 가독성 개선
+#    1. 병해충명 검색 시 최대 3개 다중 선택(AND 조건) 기능 추가
+#    2. 다중 조건 불만족 시 "모두 만족하는 농약 없음" 메시지 및 각 병해충별 농약 리스트 개별 출력
 # ==========================================
 
 import streamlit as st
@@ -40,7 +39,7 @@ if 'active_menu' not in st.session_state:
     st.session_state.active_menu = "내가 필요한 농약 찾기"
 
 # ==========================================
-# 🎨 UI 디자인 20.5 (CSS 스타일)
+# 🎨 UI 디자인 20.6 (CSS 스타일)
 # ==========================================
 st.markdown("""
     <style>
@@ -102,7 +101,6 @@ st.markdown("""
     .ai-result-card h3 { color: #e65100; margin: 0 0 5px 0; }
     .ai-result-card p { font-size: 22px; font-weight: 900; margin: 0; color: #2e7d32; }
     
-    /* 💡 검색 헤더 CSS 영역 (라이트모드) */
     .search-header-pest { background: linear-gradient(to right, #f1f8e9, transparent); padding: 15px 20px; border-left: 5px solid #4caf50; border-radius: 8px; margin-bottom: 15px; }
     .search-header-pest h3 { margin:0; color:#2e7d32; }
     .search-header-bug { background: linear-gradient(to right, #fff8e1, transparent); padding: 15px 20px; border-left: 5px solid #ffb300; border-radius: 8px; margin-bottom: 15px; }
@@ -131,7 +129,6 @@ st.markdown("""
         .ai-result-card h3 { color: #ffb74d; }
         .ai-result-card p { color: #a5d6a7; }
         
-        /* 💡 검색 헤더 CSS 영역 (다크모드) */
         .search-header-pest { background: linear-gradient(to right, #1b5e20, transparent); }
         .search-header-pest h3 { color: #a5d6a7; }
         .search-header-bug { background: linear-gradient(to right, #4e342e, transparent); }
@@ -390,35 +387,64 @@ else:
     # 메뉴 2 & 3: 농약명/병해충명으로 찾기
     # ----------------------------------------
     elif menu in ["농약명으로 찾기", "병해충명으로 찾기"]:
-        # 💡 전체 화면보다 좁게 가로 사이즈 조정 및 중앙 정렬 (1.5 : 7 : 1.5 비율)
         _, col_center, _ = st.columns([1.5, 7, 1.5])
         
         with col_center:
-            # 1. 검색 입력 영역 
+            # --- 농약명으로 찾기 (단일 검색) ---
             if menu == "농약명으로 찾기":
                 st.markdown("<div class='search-header-pest'><h3>🔍 농약명 검색</h3></div>", unsafe_allow_html=True)
                 search_val = st.selectbox("농약 상품명 선택/입력:", options=pesticide_list, index=None, placeholder="찾으시는 농약명을 검색하세요", label_visibility="collapsed")
-                target_col = '상품명'
+                
+                st.markdown("<hr style='border: 1px dashed #cccccc; margin: 30px 0;'>", unsafe_allow_html=True)
+                
+                if search_val and search_val.strip():
+                    res = df_database[df_database['상품명'].astype(str) == search_val]
+                    
+                    if res.empty:
+                        st.error("찾을 수 없습니다. 다시 입력해주세요!")
+                    else:
+                        st.markdown("<div class='search-header-result'><h3>📑 검색 결과</h3></div>", unsafe_allow_html=True)
+                        st.success("💡 표의 열 제목을 클릭하면 정렬됩니다.")
+                        render_styled_dataframe(res)
+                        render_moa_popup_trigger(res)
+                        
+            # --- 병해충명으로 찾기 (다중 검색 - 최대 3개, AND 로직) ---
             else:
-                st.markdown("<div class='search-header-bug'><h3>🐛 병해충명 검색</h3></div>", unsafe_allow_html=True)
-                search_val = st.selectbox("병해충명 선택/입력:", options=pest_list, index=None, placeholder="찾으시는 병해충명을 검색하세요", label_visibility="collapsed")
-                target_col = '적용병해충'
+                st.markdown("<div class='search-header-bug'><h3>🐛 병해충명 검색 (최대 3개 입력 가능)</h3></div>", unsafe_allow_html=True)
                 
-            # 검색창과 결과창의 시각적 분리선
-            st.markdown("<hr style='border: 1px dashed #cccccc; margin: 30px 0;'>", unsafe_allow_html=True)
-            
-            # 2. 검색 결과 영역
-            if search_val and search_val.strip():
-                if target_col == '상품명': res = df_database[df_database[target_col].astype(str) == search_val]
-                else: res = df_database[df_database[target_col].astype(str).str.contains(search_val)]
+                # 💡 수정사항 1: 다중 선택 창으로 변경 (최대 3개 제한)
+                search_vals = st.multiselect("병해충명 선택/입력:", options=pest_list, placeholder="찾으시는 병해충명을 검색하세요 (최대 3개)", max_selections=3, label_visibility="collapsed")
                 
-                if res.empty:
-                    st.error("찾을 수 없습니다. 다시 입력해주세요!")
-                else:
-                    st.markdown("<div class='search-header-result'><h3>📑 검색 결과</h3></div>", unsafe_allow_html=True)
-                    st.success("💡 표의 열 제목을 클릭하면 정렬됩니다.")
-                    render_styled_dataframe(res)
-                    render_moa_popup_trigger(res)
+                st.markdown("<hr style='border: 1px dashed #cccccc; margin: 30px 0;'>", unsafe_allow_html=True)
+                
+                if search_vals:
+                    # 💡 수정사항 1: 선택한 모든 병해충(AND)을 포함하는 약제 필터링
+                    res = df_database.copy()
+                    for val in search_vals:
+                        res = res[res['적용병해충'].astype(str).str.contains(val)]
+                    
+                    # 💡 수정사항 2: 조건을 모두 만족하는 약제가 없을 경우 처리
+                    if res.empty:
+                        if len(search_vals) > 1:
+                            st.error("🚨 입력조건을 모두 만족하는 농약은 없습니다.")
+                            st.markdown("#### 💡 각 병해충 조건별 적용 가능한 농약")
+                            
+                            # 각 병해충별로 리스트 개별 출력
+                            for val in search_vals:
+                                individual_res = df_database[df_database['적용병해충'].astype(str).str.contains(val)]
+                                if not individual_res.empty:
+                                    pesticides_str = ", ".join(individual_res['상품명'].unique().tolist())
+                                    st.info(f"**[{val}]** : {pesticides_str}")
+                                else:
+                                    st.warning(f"**[{val}]** : 등록된 농약이 없습니다.")
+                        else:
+                            st.error("찾을 수 없습니다. 다시 입력해주세요!")
+                    else:
+                        # 모두 만족하는 결과가 있을 때 정상 출력
+                        st.markdown("<div class='search-header-result'><h3>📑 검색 결과</h3></div>", unsafe_allow_html=True)
+                        st.success("💡 표의 열 제목을 클릭하면 정렬됩니다.")
+                        render_styled_dataframe(res)
+                        render_moa_popup_trigger(res)
 
     # ----------------------------------------
     # 메뉴 4: 작용기작 찾기
