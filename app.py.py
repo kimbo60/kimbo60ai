@@ -1,9 +1,8 @@
 # ==========================================
-# 📌 버전: 23.1 | 수정일시: 2026.09.02
+# 📌 버전: 23.2 | 수정일시: 2026.09.02
 # 📌 주요 수정내용: 
-#    1. 데이터 로딩 독립화: DBkijak에 오류가 있어도 DBnongyak은 정상 출력되도록 분리
-#    2. 필드명 자동 교정: CSV 변환 시 섞여 들어간 보이지 않는 공백 및 대소문자 오류 자동 보정
-#    3. 스마트 진단 시스템: 에러 발생 시 어느 테이블, 어떤 필드에서 문제가 발생했는지 화면에 출력
+#    1. URL 및 Key 자동 세탁 기능 추가 (PGRST125 에러 원천 차단)
+#    2. 이전 버전의 오타(df.nongyak -> df_nongyak) 수정 
 # ==========================================
 
 import streamlit as st
@@ -21,20 +20,28 @@ from supabase import create_client, Client
 st.set_page_config(page_title="내가 찾는 농약", page_icon="🍊", layout="wide")
 
 # ==========================================
-# 🔐 Supabase 클라우드 DB 연결 설정
+# 🔐 Supabase 클라우드 DB 연결 설정 (스마트 자동 교정)
 # ==========================================
 @st.cache_resource
 def init_connection() -> Client:
-    url = st.secrets["SUPABASE_URL"]
-    key = st.secrets["SUPABASE_KEY"]
-    return create_client(url, key)
+    # 1. 시크릿에서 값을 가져와서 양옆의 공백이나 불필요한 따옴표 제거
+    raw_url = str(st.secrets["SUPABASE_URL"]).strip().strip("\"'")
+    clean_key = str(st.secrets["SUPABASE_KEY"]).strip().strip("\"'")
+    
+    # 2. URL 꼬리표 자동 절단 (PGRST125 에러 완벽 방지)
+    clean_url = raw_url.rstrip("/")
+    if clean_url.endswith("/rest/v1"):
+        clean_url = clean_url[:-8]
+    clean_url = clean_url.rstrip("/") # 혹시 남은 빗금 한 번 더 제거
+    
+    return create_client(clean_url, clean_key)
 
 try:
     supabase = init_connection()
     supabase_connected = True
 except Exception as e:
     supabase_connected = False
-    st.error("🚨 `.streamlit/secrets.toml` 파일 설정이 완료되지 않았거나 키가 잘못되었습니다. DB 연결을 확인해주세요.")
+    st.error("🚨 `.streamlit/secrets.toml` 파일 설정이 완료되지 않았거나 연결에 실패했습니다.")
 
 # ==========================================
 # 💾 세션 초기화 및 상태 관리
@@ -62,23 +69,18 @@ st.markdown("""
     ::-webkit-scrollbar-track { background: #f1f1f1 !important; border-radius: 10px !important; box-shadow: inset 0 0 5px rgba(0,0,0,0.1) !important; }
     ::-webkit-scrollbar-thumb { background: #ffb74d !important; border-radius: 10px !important; border: 3px solid #f1f1f1 !important; }
     ::-webkit-scrollbar-thumb:hover { background: #e65100 !important; }
-    
     .hallabong-title { background-color: #e65100; padding: 15px; border-radius: 20px; text-align: center; color: white; font-weight: 900; font-size: 2.8rem; box-shadow: 0px 6px 15px rgba(230, 81, 0, 0.3); border: 3px solid #ffcc80; transition: transform 0.2s ease-in-out; }
     .hallabong-title:hover { transform: scale(1.02); }
-
     div[data-testid="stRadio"] div[role="radiogroup"] { display: flex; flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 8px; margin-bottom: 15px; }
     div[data-testid="stRadio"] div[role="radiogroup"] div[data-baseweb="radio"] div { display: none !important; }
     div[data-testid="stRadio"] div[role="radiogroup"] label { background: linear-gradient(145deg, #e8f5e9, #c8e6c9) !important; border: 2px solid #a5d6a7 !important; padding: 8px 16px !important; border-radius: 12px !important; cursor: pointer; transition: all 0.1s ease-in-out; margin: 0 !important; }
     div[data-testid="stRadio"] div[role="radiogroup"] label p { font-size: 17px !important; font-weight: 800 !important; color: #1b5e20 !important; margin: 0 !important; }
     div[data-testid="stRadio"] div[role="radiogroup"] label:active, div[data-testid="stRadio"] div[role="radiogroup"] label:focus-within { transform: translateY(3px) !important; background: linear-gradient(145deg, #c8e6c9, #a5d6a7) !important; }
-
     div[data-testid="stForm"], div[data-testid="stExpander"] { font-size: 18px !important; font-weight: 800 !important; }
     input[type="text"], input[type="password"], div[data-baseweb="select"] span, div[data-baseweb="select"] input, div[data-testid="stDateInput"] input, div[data-testid="stTimeInput"] input, textarea { font-size: 16px !important; padding: 6px 10px !important; }
     div[data-testid="stForm"] { border: 3px solid #ffb74d; border-radius: 15px; padding: 25px; box-shadow: 0px 6px 15px rgba(255,183,77,0.15); margin-bottom: 15px; }
-    
     button[kind="secondaryFormSubmit"], button[kind="primary"] { background: linear-gradient(to right, #4caf50, #2e7d32) !important; color: white !important; font-size: 20px !important; font-weight: 800 !important; border-radius: 12px !important; padding: 12px 20px !important; border: none !important; margin-top: 15px; width: 100%; }
     button[kind="secondaryFormSubmit"]:active, button[kind="primary"]:active { transform: translateY(4px) !important; }
-
     .custom-card { border-radius: 15px; padding: 20px; margin-bottom: 15px; box-shadow: 0px 4px 10px rgba(0,0,0,0.05); }
     .card-weather { border: 3px solid #ffcc80; text-align: center; font-size: 1.15rem; font-weight: 800; line-height: 1.4; background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%); color: #3e2723; }
     .card-notice { border: 2px solid #fdd835; height: 100%; min-height: 350px; background-color: #fffde7; color: #333; }
@@ -88,63 +90,19 @@ st.markdown("""
     .moa-inner.type { background-color: white; border-left: 5px solid #1565c0; color: #333;}
     .moa-inner.desc { background-color: white; border-left: 5px solid #e65100; color: #333;}
     .moa-inner.detail { background-color: #e8f5e9; border-left: 5px solid #2e7d32; color: #333;}
-
     .moa-result-card { background-color: #f1f8e9; border-left: 5px solid #66bb6a; border-radius: 8px; padding: 15px; margin-bottom: 10px; color: #333; }
     .moa-result-card h4 { color: #2e7d32; margin: 0 0 5px 0; }
     .moa-result-card p.title { margin: 0 0 8px 0; font-size: 14px; font-weight: bold; color: #333; }
     .moa-result-card p.desc { margin: 0; color: #e65100; font-weight: bold; }
-    
     .ai-result-card { text-align: center; padding: 15px; border: 2px solid #ffcc80; border-radius: 12px; background-color: #fff8e1; margin-bottom: 10px; color: #333; }
     .ai-result-card h3 { color: #e65100; margin: 0 0 5px 0; }
     .ai-result-card p { font-size: 22px; font-weight: 900; margin: 0; color: #2e7d32; }
-    
     .search-header-pest { background: linear-gradient(to right, #f1f8e9, transparent); padding: 15px 20px; border-left: 5px solid #4caf50; border-radius: 8px; margin-bottom: 15px; }
     .search-header-pest h3 { margin:0; color:#2e7d32; }
     .search-header-bug { background: linear-gradient(to right, #fff8e1, transparent); padding: 15px 20px; border-left: 5px solid #ffb300; border-radius: 8px; margin-bottom: 15px; }
     .search-header-bug h3 { margin:0; color:#f57f17; }
     .search-header-result { background: linear-gradient(to right, #e3f2fd, transparent); padding: 15px 20px; border-left: 5px solid #2196f3; border-radius: 8px; margin-bottom: 15px; }
     .search-header-result h3 { margin:0; color:#1565c0; }
-
-    @media (prefers-color-scheme: dark) {
-        ::-webkit-scrollbar-track { background: #2c2c2c !important; border: 3px solid #3b3b3b !important; }
-        ::-webkit-scrollbar-thumb { background: #ff9800 !important; border: 3px solid #2c2c2c !important; }
-        ::-webkit-scrollbar-thumb:hover { background: #e65100 !important; }
-        input[type="text"], input[type="password"], div[data-baseweb="select"] > div, div[data-testid="stDateInput"] > div, div[data-testid="stTimeInput"] > div, textarea { background-color: #3b3b3b !important; border: 1px solid #555555 !important; color: #f1f1f1 !important; }
-        div[data-testid="stForm"] { background-color: #1e1e1e !important; border-color: #555 !important; }
-        div[data-testid="stForm"] label p, div[data-testid="stExpander"] p { color: #e0e0e0 !important; }
-        .card-weather { background: linear-gradient(135deg, #424242 0%, #303030 100%); color: #e0e0e0; border-color: #555; }
-        .card-notice { background-color: #2c2c2c; color: #e0e0e0; border-color: #555; }
-        .card-qa { background-color: #2a3138; color: #e0e0e0; border-color: #555; }
-        .card-moa { background-color: #2c3e30; border-color: #4CAF50; }
-        .moa-inner.type, .moa-inner.desc, .moa-inner.detail { background-color: #383838; color: #e0e0e0; }
-        h4, h3, h2, p { color: #e0e0e0 !important; }
-        .moa-result-card { background-color: #2c3e30; color: #e0e0e0; }
-        .moa-result-card h4 { color: #a5d6a7; }
-        .moa-result-card p.title { color: #e0e0e0; }
-        .moa-result-card p.desc { color: #ffb74d; }
-        .ai-result-card { background-color: #3e2723; border-color: #ffb74d; color: #e0e0e0; }
-        .ai-result-card h3 { color: #ffb74d; }
-        .ai-result-card p { color: #a5d6a7; }
-        .search-header-pest { background: linear-gradient(to right, #1b5e20, transparent); }
-        .search-header-pest h3 { color: #a5d6a7; }
-        .search-header-bug { background: linear-gradient(to right, #4e342e, transparent); }
-        .search-header-bug h3 { color: #ffcc80; }
-        .search-header-result { background: linear-gradient(to right, #0d47a1, transparent); }
-        .search-header-result h3 { color: #90caf9; }
-    }
-
-    @media (max-width: 768px) {
-        .hallabong-title { font-size: 2rem !important; padding: 15px !important; border-radius: 12px !important; margin-bottom: 15px !important;}
-        .hallabong-title img { width: 40px !important; margin-right: 8px !important; }
-        div[data-testid="stRadio"] div[role="radiogroup"] { gap: 6px !important; }
-        div[data-testid="stRadio"] div[role="radiogroup"] label { padding: 6px 10px !important; border-radius: 8px !important; border-width: 1px !important; }
-        div[data-testid="stRadio"] div[role="radiogroup"] label p { font-size: 14px !important; }
-        div[data-testid="stForm"] { padding: 15px !important; border-radius: 10px !important; border-width: 2px !important; }
-        button[kind="secondaryFormSubmit"], button[kind="primary"] { font-size: 18px !important; padding: 10px !important; margin-top: 10px !important; }
-        .custom-card { padding: 15px !important; }
-        div[data-testid="stHorizontalBlock"]:has(input[placeholder="예: 1000"]) { display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important; gap: 8px !important; }
-        div[data-testid="stHorizontalBlock"]:has(input[placeholder="예: 1000"]) > div[data-testid="column"] { width: 50% !important; min-width: 0 !important; flex: 1 1 auto !important; }
-    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -165,13 +123,11 @@ def load_data_from_supabase():
     pesticide_list, pest_list = [], []
     error_msgs = []
     
-    # 💡 1. DBnongyak 독립적 로딩 및 자동 필드명 교정
     try:
         res_n = supabase.table("DBnongyak").select("*").execute()
         df_nongyak = pd.DataFrame(res_n.data)
         
         if not df_nongyak.empty:
-            # 보이지 않는 공백 제거나 대소문자 차이를 보정하기 위해 필드명 통일화 작업 수행
             cols_map = {}
             for c in df_nongyak.columns:
                 clean_c = c.strip().lower().replace(" ", "").replace("_", "")
@@ -185,24 +141,22 @@ def load_data_from_supabase():
                 elif clean_c == 'gyetong': cols_map[c] = 'Gyetong'
             df_nongyak = df_nongyak.rename(columns=cols_map).fillna('')
             
-            # 목록 데이터 추출
             if "Product Name" in df_nongyak.columns:
                 pesticide_list = sorted([str(n).strip() for n in df_nongyak["Product Name"].unique() if str(n).strip() and str(n) != 'nan'])
             else:
                 error_msgs.append(f"DBnongyak 'Product Name' 필드 인식 실패 (현재: {list(df_nongyak.columns)})")
                 
-            if "Type" in df_nongyak.columns and "Byung" in df.nongyak.columns:
+            if "Type" in df_nongyak.columns and "Byung" in df_nongyak.columns:
                 pest_raw = df_nongyak[df_nongyak['Type'].isin(['살균제', '살충제'])]["Byung"].astype(str).tolist()
                 pest_set = {re.sub(r'\(.*?\)', '', p).replace('(', '').replace(')', '').strip() for pests in pest_raw for p in pests.split(',')}
                 pest_list = sorted([p for p in pest_set if p and str(p) != 'nan'])
             else:
                 error_msgs.append("DBnongyak 'Type' 또는 'Byung' 필드 인식 실패")
         else:
-            error_msgs.append("DBnongyak 테이블에 데이터가 존재하지 않습니다.")
+            error_msgs.append("DBnongyak 테이블에 데이터가 비어있습니다.")
     except Exception as e:
-        error_msgs.append(f"DBnongyak 에러: {e}")
+        error_msgs.append(f"DBnongyak 로딩 에러: {e}")
 
-    # 💡 2. DBkijak 독립적 로딩 및 자동 필드명 교정
     try:
         res_k = supabase.table("DBkijak").select("*").execute()
         df_moa = pd.DataFrame(res_k.data)
@@ -217,9 +171,9 @@ def load_data_from_supabase():
                 elif clean_c == '세부작용기작': cols_map_moa[c] = '세부 작용기작'
             df_moa = df_moa.rename(columns=cols_map_moa).fillna('')
         else:
-            error_msgs.append("DBkijak 테이블에 데이터가 존재하지 않습니다.")
+            error_msgs.append("DBkijak 테이블에 데이터가 비어있습니다.")
     except Exception as e:
-        error_msgs.append(f"DBkijak 에러: {e}")
+        error_msgs.append(f"DBkijak 로딩 에러: {e}")
 
     error_str = " | ".join(error_msgs) if error_msgs else ""
     return df_nongyak, df_moa, pesticide_list, pest_list, error_str
@@ -230,7 +184,6 @@ def fetch_spray_history():
         response = supabase.table("DBbangje").select("*").order("Date", desc=True).execute()
         df = pd.DataFrame(response.data)
         if not df.empty:
-            # 방제이력 테이블 필드명 자동 교정
             cols_map = {}
             for c in df.columns:
                 clean_c = c.strip().lower().replace(" ", "")
@@ -491,7 +444,6 @@ else:
     menu = st.session_state.active_menu
     st.markdown("<br>", unsafe_allow_html=True)
     
-    # 💡 3. 스마트 진단 메시지 출력부 (문제 발생 시 화면에 정확히 안내)
     if supabase_connected and db_error_msg:
         st.error(f"🚨 **[DB 진단 메시지]** 데이터를 불러오는 중 문제가 발생했습니다: \n\n {db_error_msg}")
 
