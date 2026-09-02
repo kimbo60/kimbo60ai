@@ -1,8 +1,8 @@
 # ==========================================
-# 📌 버전: 22.0 | 수정일시: 2026.09.02
+# 📌 버전: 22.1 | 수정일시: 2026.09.02
 # 📌 주요 수정내용: 
-#    1. Supabase Key 값 추가에 따른 데이터프레임 필터링(화면 출력) 안정화
-#    2. DBbangje 테이블 저장 시 컬럼명 띄어쓰기 제거(총살포량)로 DB 구조 최적화
+#    1. 나의 방제이력 빈 데이터(Empty) 시 발생하는 AttributeError 수정 (빈 표출력으로 변경)
+#    2. Supabase 데이터 로딩 실패 시 에러 핸들링 안정화
 # ==========================================
 
 import streamlit as st
@@ -193,7 +193,6 @@ def fetch_spray_history():
 df_database, df_moa_db, pesticide_list, pest_list = load_data_from_supabase()
 
 def render_styled_dataframe(df):
-    # DB에 id 등의 키값이 추가되었더라도 필요한 열만 필터링하여 화면에 보여줍니다.
     display_columns = ['종류', '상품명', '작용기작', '규격', '사용량', '금액 (원)', '적용병해충', '계통']
     df = df[[col for col in display_columns if col in df.columns]].copy()
     if '금액 (원)' in df.columns: df['금액 (원)'] = pd.to_numeric(df['금액 (원)'], errors='coerce')
@@ -213,7 +212,7 @@ def render_moa_popup_trigger(df_current_result):
         
         if selected_moa != "선택 안 함":
             if df_moa_db.empty:
-                st.error("🚨 작용기작 DB 정보를 불러올 수 없습니다.")
+                st.error("🚨 작용기작 DB 정보를 불러올 수 없습니다. (Supabase RLS 설정 해제를 확인해주세요.)")
                 return
                 
             moa_list = [m.strip() for m in str(selected_moa).replace(',', '+').replace('/', '+').split('+') if m.strip()]
@@ -544,7 +543,7 @@ else:
         col_limit, _ = st.columns([7, 3])
         with col_limit:
             st.subheader("🔬 작용기작 사전")
-            if df_moa_db.empty: st.error("🚨 DB에서 작용기작 정보를 불러올 수 없습니다.")
+            if df_moa_db.empty: st.error("🚨 DB에서 작용기작 정보를 불러올 수 없습니다. (Supabase에서 Disable RLS 처리를 확인해주세요.)")
             else:
                 moa_codes = sorted([str(code).strip() for code in df_moa_db['표시기호'].unique() if str(code).strip() and str(code) != 'nan'])
                 search_moa = st.selectbox("궁금한 작용기작 코드 검색/선택:", options=moa_codes, index=None, placeholder="예: 가1, 1a, H01")
@@ -574,10 +573,13 @@ else:
         
         df_history = fetch_spray_history()
         
+        # 💡 수정사항: DB에 내용이 없을 때 에러가 나지 않도록 빈 표(컬럼만 있는 상태)를 보여줍니다.
         if df_history.empty: 
-            # 💡 기존 가상 데이터 포맷을 유지하여 초기 화면 구성 안내
-            st.info("아직 등록된 방제 이력이 없습니다. 아래에서 새로운 기록을 추가해보세요!")
-            st.dataframe(st.session_state.spray_history, hide_index=True)
+            st.info("아직 등록된 방제 이력이 없습니다. (아래에서 새로운 기록을 추가해보세요!)")
+            empty_columns = ["방제일자", "방제시작", "작물명", "총살포량", "약제종류", "상품명", "작용기작", "규격", "수량", "적용병해충", "계통", "메모"]
+            empty_df = pd.DataFrame(columns=empty_columns)
+            styled_empty = empty_df.style.set_properties(**{'font-size': '14.5px', 'text-align': 'center', 'padding': '8px 10px', 'white-space': 'nowrap'})
+            st.dataframe(styled_empty, hide_index=True)
         else:
             styled_history = df_history.style.set_properties(**{'font-size': '14.5px', 'text-align': 'center', 'padding': '8px 10px', 'white-space': 'nowrap'})
             st.dataframe(styled_history, hide_index=True)
@@ -646,7 +648,6 @@ else:
                     
                     db_insert_data = []
                     for rec in records_to_add:
-                        # 💡 수정사항: DB 저장 시 띄어쓰기로 인한 오류 방지를 위해 '총살포량'으로 통합
                         db_insert_data.append({
                             "방제일자": dt_str, "방제시작": time_str, "작물명": h_crop, "총살포량": f"{h_vol} {h_unit}",
                             "약제종류": rec['type'], "상품명": rec['name'], "작용기작": rec['moa'], "규격": rec['size'],
