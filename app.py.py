@@ -1,8 +1,8 @@
 # ==========================================
-# 📌 버전: 20.8 | 수정일시: 2026.09.01
+# 📌 버전: 22.0 | 수정일시: 2026.09.02
 # 📌 주요 수정내용: 
-#    1. 검색 결과 5개 이상 시 '더 보기' 대신 표 내부 스크롤 기능으로 변경
-#    2. 전체 화면 및 데이터 표의 스크롤 막대(Scrollbar) 크기 확대 및 가시성 개선
+#    1. Supabase Key 값 추가에 따른 데이터프레임 필터링(화면 출력) 안정화
+#    2. DBbangje 테이블 저장 시 컬럼명 띄어쓰기 제거(총살포량)로 DB 구조 최적화
 # ==========================================
 
 import streamlit as st
@@ -14,9 +14,26 @@ import base64
 import time
 import requests
 import urllib.parse
+from supabase import create_client, Client
 
 # 1. 앱 기본 설정
 st.set_page_config(page_title="내가 찾는 농약", page_icon="🍊", layout="wide")
+
+# ==========================================
+# 🔐 Supabase 클라우드 DB 연결 설정
+# ==========================================
+@st.cache_resource
+def init_connection() -> Client:
+    url = st.secrets["SUPABASE_URL"]
+    key = st.secrets["SUPABASE_KEY"]
+    return create_client(url, key)
+
+try:
+    supabase = init_connection()
+    supabase_connected = True
+except Exception as e:
+    supabase_connected = False
+    st.error("🚨 `.streamlit/secrets.toml` 파일 설정이 완료되지 않았거나 키가 잘못되었습니다. DB 연결을 확인해주세요.")
 
 # ==========================================
 # 💾 세션 초기화 및 상태 관리
@@ -25,12 +42,8 @@ if 'notices' not in st.session_state:
     st.session_state.notices = ["<b>[필독]</b> 장마철 검은점무늬병 주의보 발령 (누적 강수량 200mm 초과 예상)", "[안내] 신규 등록 약제(살균제) 3종 리스트 업데이트 완료"]
 if 'qnas' not in st.session_state:
     st.session_state.qnas = [{"author": "제주농부", "content": "잎 뒷면에 이런 하얀 딱지가 생겼는데 더뎅이병일까요?", "reply": "👨‍🌾 KIMBO: 사진상으로는 볼록총채벌레 피해 흔적과 유사해 보입니다."}]
-if 'spray_history' not in st.session_state:
-    st.session_state.spray_history = pd.DataFrame({
-        "방제일자": ["2026년 08월 12일(수)"], "방제시작": ["05:00"], "작물명": ["노지 감귤"], "총 살포량": ["1000 L"],
-        "약제종류": ["살균제"], "상품명": ["다이센엠"], "작용기작": ["카"], "규격": ["1kg"], "수량": ["2개"],
-        "적용병해충": ["검은점무늬병"], "계통": ["만코제브"], "메모": ["장마 후 예방살포"]
-    })
+if 'list_count' not in st.session_state: 
+    st.session_state.list_count = 5
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 if 'current_user' not in st.session_state:
@@ -39,67 +52,32 @@ if 'active_menu' not in st.session_state:
     st.session_state.active_menu = "내가 필요한 농약 찾기"
 
 # ==========================================
-# 🎨 UI 디자인 20.8 (CSS 스타일)
+# 🎨 UI 디자인 (CSS 스타일)
 # ==========================================
 st.markdown("""
     <style>
     a.home-link { text-decoration: none !important; }
     
-    /* 💡 수정사항: 스크롤 막대(Scrollbar) 크기 확대 및 가시성(오렌지색) 개선 */
-    ::-webkit-scrollbar {
-        width: 18px !important;
-        height: 18px !important;
-    }
-    ::-webkit-scrollbar-track {
-        background: #f1f1f1 !important;
-        border-radius: 10px !important;
-        box-shadow: inset 0 0 5px rgba(0,0,0,0.1) !important;
-    }
-    ::-webkit-scrollbar-thumb {
-        background: #ffb74d !important;
-        border-radius: 10px !important;
-        border: 3px solid #f1f1f1 !important;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-        background: #e65100 !important;
-    }
+    ::-webkit-scrollbar { width: 18px !important; height: 18px !important; }
+    ::-webkit-scrollbar-track { background: #f1f1f1 !important; border-radius: 10px !important; box-shadow: inset 0 0 5px rgba(0,0,0,0.1) !important; }
+    ::-webkit-scrollbar-thumb { background: #ffb74d !important; border-radius: 10px !important; border: 3px solid #f1f1f1 !important; }
+    ::-webkit-scrollbar-thumb:hover { background: #e65100 !important; }
     
-    .hallabong-title {
-        background-color: #e65100;
-        padding: 15px; border-radius: 20px; text-align: center; color: white;
-        font-weight: 900; font-size: 2.8rem; box-shadow: 0px 6px 15px rgba(230, 81, 0, 0.3);
-        margin-bottom: 0px; border: 3px solid #ffcc80; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-        transition: transform 0.2s ease-in-out;
-    }
+    .hallabong-title { background-color: #e65100; padding: 15px; border-radius: 20px; text-align: center; color: white; font-weight: 900; font-size: 2.8rem; box-shadow: 0px 6px 15px rgba(230, 81, 0, 0.3); border: 3px solid #ffcc80; transition: transform 0.2s ease-in-out; }
     .hallabong-title:hover { transform: scale(1.02); }
 
     div[data-testid="stRadio"] div[role="radiogroup"] { display: flex; flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 8px; margin-bottom: 15px; }
     div[data-testid="stRadio"] div[role="radiogroup"] div[data-baseweb="radio"] div { display: none !important; }
-    div[data-testid="stRadio"] div[role="radiogroup"] label {
-        background: linear-gradient(145deg, #e8f5e9, #c8e6c9) !important; 
-        border: 2px solid #a5d6a7 !important; padding: 8px 16px !important; border-radius: 12px !important;
-        box-shadow: 0px 4px 0px #81c784, 0px 6px 8px rgba(0,0,0,0.1) !important;
-        cursor: pointer; transition: all 0.1s ease-in-out; margin: 0 !important;
-    }
+    div[data-testid="stRadio"] div[role="radiogroup"] label { background: linear-gradient(145deg, #e8f5e9, #c8e6c9) !important; border: 2px solid #a5d6a7 !important; padding: 8px 16px !important; border-radius: 12px !important; cursor: pointer; transition: all 0.1s ease-in-out; margin: 0 !important; }
     div[data-testid="stRadio"] div[role="radiogroup"] label p { font-size: 17px !important; font-weight: 800 !important; color: #1b5e20 !important; margin: 0 !important; }
-    div[data-testid="stRadio"] div[role="radiogroup"] label:active, div[data-testid="stRadio"] div[role="radiogroup"] label:focus-within {
-        transform: translateY(3px) !important; box-shadow: 0px 1px 0px #81c784, 0px 3px 4px rgba(0,0,0,0.1) !important;
-        background: linear-gradient(145deg, #c8e6c9, #a5d6a7) !important;
-    }
+    div[data-testid="stRadio"] div[role="radiogroup"] label:active, div[data-testid="stRadio"] div[role="radiogroup"] label:focus-within { transform: translateY(3px) !important; background: linear-gradient(145deg, #c8e6c9, #a5d6a7) !important; }
 
     div[data-testid="stForm"], div[data-testid="stExpander"] { font-size: 18px !important; font-weight: 800 !important; }
-    input[type="text"], input[type="password"], div[data-baseweb="select"] span, div[data-baseweb="select"] input, div[data-testid="stDateInput"] input, div[data-testid="stTimeInput"] input, textarea { 
-        font-size: 16px !important; padding: 6px 10px !important; 
-    }
-    
+    input[type="text"], input[type="password"], div[data-baseweb="select"] span, div[data-baseweb="select"] input, div[data-testid="stDateInput"] input, div[data-testid="stTimeInput"] input, textarea { font-size: 16px !important; padding: 6px 10px !important; }
     div[data-testid="stForm"] { border: 3px solid #ffb74d; border-radius: 15px; padding: 25px; box-shadow: 0px 6px 15px rgba(255,183,77,0.15); margin-bottom: 15px; }
     
-    button[kind="secondaryFormSubmit"], button[kind="primary"] {
-        background: linear-gradient(to right, #4caf50, #2e7d32) !important; color: white !important; font-size: 20px !important; font-weight: 800 !important;
-        border-radius: 12px !important; padding: 12px 20px !important; border: none !important; box-shadow: 0px 6px 0px #1b5e20, 0px 8px 10px rgba(0,0,0,0.2) !important;
-        transition: all 0.1s; margin-top: 15px; width: 100%; 
-    }
-    button[kind="secondaryFormSubmit"]:active, button[kind="primary"]:active { box-shadow: 0px 2px 0px #1b5e20, 0px 4px 5px rgba(0,0,0,0.2) !important; transform: translateY(4px) !important; }
+    button[kind="secondaryFormSubmit"], button[kind="primary"] { background: linear-gradient(to right, #4caf50, #2e7d32) !important; color: white !important; font-size: 20px !important; font-weight: 800 !important; border-radius: 12px !important; padding: 12px 20px !important; border: none !important; margin-top: 15px; width: 100%; }
+    button[kind="secondaryFormSubmit"]:active, button[kind="primary"]:active { transform: translateY(4px) !important; }
 
     .custom-card { border-radius: 15px; padding: 20px; margin-bottom: 15px; box-shadow: 0px 4px 10px rgba(0,0,0,0.05); }
     .card-weather { border: 3px solid #ffcc80; text-align: center; font-size: 1.15rem; font-weight: 800; line-height: 1.4; background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%); color: #3e2723; }
@@ -128,22 +106,11 @@ st.markdown("""
     .search-header-result h3 { margin:0; color:#1565c0; }
 
     @media (prefers-color-scheme: dark) {
-        /* 다크모드 스크롤바 */
-        ::-webkit-scrollbar-track {
-            background: #2c2c2c !important;
-            border: 3px solid #3b3b3b !important;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #ff9800 !important;
-            border: 3px solid #2c2c2c !important;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #e65100 !important;
-        }
+        ::-webkit-scrollbar-track { background: #2c2c2c !important; border: 3px solid #3b3b3b !important; }
+        ::-webkit-scrollbar-thumb { background: #ff9800 !important; border: 3px solid #2c2c2c !important; }
+        ::-webkit-scrollbar-thumb:hover { background: #e65100 !important; }
         
-        input[type="text"], input[type="password"], div[data-baseweb="select"] > div, div[data-testid="stDateInput"] > div, div[data-testid="stTimeInput"] > div, textarea {
-            background-color: #3b3b3b !important; border: 1px solid #555555 !important; color: #f1f1f1 !important;
-        }
+        input[type="text"], input[type="password"], div[data-baseweb="select"] > div, div[data-testid="stDateInput"] > div, div[data-testid="stTimeInput"] > div, textarea { background-color: #3b3b3b !important; border: 1px solid #555555 !important; color: #f1f1f1 !important; }
         div[data-testid="stForm"] { background-color: #1e1e1e !important; border-color: #555 !important; }
         div[data-testid="stForm"] label p, div[data-testid="stExpander"] p { color: #e0e0e0 !important; }
         .card-weather { background: linear-gradient(135deg, #424242 0%, #303030 100%); color: #e0e0e0; border-color: #555; }
@@ -179,18 +146,14 @@ st.markdown("""
         button[kind="secondaryFormSubmit"], button[kind="primary"] { font-size: 18px !important; padding: 10px !important; margin-top: 10px !important; }
         .custom-card { padding: 15px !important; }
         
-        div[data-testid="stHorizontalBlock"]:has(input[placeholder="예: 1000"]) {
-            display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important; gap: 8px !important;
-        }
-        div[data-testid="stHorizontalBlock"]:has(input[placeholder="예: 1000"]) > div[data-testid="column"] {
-            width: 50% !important; min-width: 0 !important; flex: 1 1 auto !important;
-        }
+        div[data-testid="stHorizontalBlock"]:has(input[placeholder="예: 1000"]) { display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important; gap: 8px !important; }
+        div[data-testid="stHorizontalBlock"]:has(input[placeholder="예: 1000"]) > div[data-testid="column"] { width: 50% !important; min-width: 0 !important; flex: 1 1 auto !important; }
     }
     </style>
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 📊 데이터 로딩 및 공용 함수
+# 📊 Supabase 기반 데이터 로딩 함수 
 # ==========================================
 @st.cache_data
 def get_image_base64(path):
@@ -198,30 +161,39 @@ def get_image_base64(path):
         with open(path, "rb") as f: return f"data:image/png;base64,{base64.b64encode(f.read()).decode()}"
     return None
 
-@st.cache_data
-def load_data():
+@st.cache_data(ttl=600)
+def load_data_from_supabase():
+    if not supabase_connected: return pd.DataFrame(), pd.DataFrame(), [], []
     try:
-        df = pd.read_excel('listall_nongyak.xlsx', header=1).fillna('')
+        response_nongyak = supabase.table("DBnongyak").select("*").execute()
+        df = pd.DataFrame(response_nongyak.data).fillna('')
+        
         pesticide_raw = df["상품명"].astype(str).unique().tolist()
-        pesticide_list = sorted([name.strip() for name in pesticide_raw if name.strip()])
+        pesticide_list = sorted([name.strip() for name in pesticide_raw if name.strip() and str(name) != 'nan'])
+        
         pest_raw = df[df['종류'].isin(['살균제', '살충제'])]["적용병해충"].astype(str).tolist()
         pest_set = {re.sub(r'\(.*?\)', '', p).replace('(', '').replace(')', '').strip() for pests in pest_raw for p in pests.split(',')}
-        pest_list = sorted([p for p in pest_set if p])
-        return df, pesticide_list, pest_list
-    except: return pd.DataFrame(), [], []
+        pest_list = sorted([p for p in pest_set if p and str(p) != 'nan'])
+        
+        response_kijak = supabase.table("DBkijak").select("*").execute()
+        df_moa = pd.DataFrame(response_kijak.data).fillna('')
+        
+        return df, df_moa, pesticide_list, pest_list
+    except Exception as e:
+        return pd.DataFrame(), pd.DataFrame(), [], []
 
-@st.cache_data
-def load_moa_data():
-    try: return pd.read_excel('kijak.xlsx').fillna('')
-    except: return pd.DataFrame()
+def fetch_spray_history():
+    if not supabase_connected: return pd.DataFrame()
+    try:
+        response = supabase.table("DBbangje").select("*").order("방제일자", desc=True).execute()
+        return pd.DataFrame(response.data).fillna('')
+    except:
+        return pd.DataFrame()
 
-df_database, pesticide_list, pest_list = load_data()
-if df_database.empty:
-    st.error("🚨 엑셀 파일('listall_nongyak.xlsx')을 읽을 수 없습니다.")
-    st.stop()
+df_database, df_moa_db, pesticide_list, pest_list = load_data_from_supabase()
 
-# 💡 수정사항: height=210 지정으로 결과가 5개 이상 시 표 내부에 자동 스크롤이 생기도록 조정
 def render_styled_dataframe(df):
+    # DB에 id 등의 키값이 추가되었더라도 필요한 열만 필터링하여 화면에 보여줍니다.
     display_columns = ['종류', '상품명', '작용기작', '규격', '사용량', '금액 (원)', '적용병해충', '계통']
     df = df[[col for col in display_columns if col in df.columns]].copy()
     if '금액 (원)' in df.columns: df['금액 (원)'] = pd.to_numeric(df['금액 (원)'], errors='coerce')
@@ -237,18 +209,16 @@ def render_moa_popup_trigger(df_current_result):
     unique_moas = [m for m in df_current_result['작용기작'].dropna().unique() if str(m).strip() and str(m).strip() != 'nan']
     if unique_moas:
         st.markdown("<p style='font-size: 16px; font-weight: 800; color: #2e7d32; margin-top: 10px; margin-bottom: 5px;'>🔬 검색된 약제의 작용기작 상세정보 확인</p>", unsafe_allow_html=True)
-        
         selected_moa = st.selectbox("아래에서 작용기작 코드를 선택하세요:", options=["선택 안 함"] + unique_moas, index=0, label_visibility="collapsed")
         
         if selected_moa != "선택 안 함":
-            df_moa = load_moa_data()
-            if df_moa.empty:
-                st.error("🚨 'kijak.xlsx' 파일 누락")
+            if df_moa_db.empty:
+                st.error("🚨 작용기작 DB 정보를 불러올 수 없습니다.")
                 return
                 
             moa_list = [m.strip() for m in str(selected_moa).replace(',', '+').replace('/', '+').split('+') if m.strip()]
             for code in moa_list:
-                moa_result = df_moa[df_moa['표시기호'].astype(str) == code]
+                moa_result = df_moa_db[df_moa_db['표시기호'].astype(str) == code]
                 if not moa_result.empty:
                     res = moa_result.iloc[0]
                     ntype = res.get('농약종류', '')
@@ -281,12 +251,15 @@ def fetch_kma_weather_7days():
     forecast_data = []
     today = date.today()
     weekdays_kr = ['월', '화', '수', '목', '금', '토', '일']
+    
     fallback_pool = [("☀️ 맑음", "24°/29°", "🟢 최적"), ("⛅ 구름", "25°/30°", "🔵 양호"), ("☁️ 흐림", "23°/26°", "🟠 보통"), ("🌧️ 비", "24°/27°", "🔴 불가"), ("☀️ 맑음", "25°/30°", "🟢 최적"), ("🌦️ 소나기", "24°/28°", "🟠 주의"), ("⛅ 구름", "26°/31°", "🔵 양호")]
+    api_success = False
 
     try:
         api_key = "6DtMoZ7RNwMuQb64EEqZluq%2B6gZJjLxP%2Fyfr3yBrx9l9EAxzw0IF%2B0nFzzTJLNvLbL92qCLArCTesMh4QKZ0Fg%3D%3D"
         decoded_key = urllib.parse.unquote(api_key)
         now = datetime.now()
+        
         base_dt = now - timedelta(days=1)
         base_date = base_dt.strftime('%Y%m%d')
         base_time = "2300"
@@ -297,30 +270,79 @@ def fetch_kma_weather_7days():
             'dataType': 'JSON', 'base_date': base_date, 'base_time': base_time,
             'nx': '53', 'ny': '38' 
         }
+        res_short = requests.get(url_short, params=params_short, timeout=3).json()
         
-        res_short = requests.get(url_short, params=params_short, timeout=2)
-        
-        if res_short.status_code == 200 and 'response' in res_short.json():
-            header_code = res_short.json()['response']['header']['resultCode']
-            if header_code == '00':
-                st.session_state.api_status = "🟢 기상청 데이터 연동됨"
-            else:
-                raise Exception(f"API Error Code: {header_code}")
-        else:
-            raise Exception("HTTP Request Failed")
+        short_parsed = {}
+        if res_short['response']['header']['resultCode'] == '00':
+            items = res_short['response']['body']['items']['item']
+            for item in items:
+                f_date = item['fcstDate']
+                cat = item['category']
+                if f_date not in short_parsed:
+                    short_parsed[f_date] = {'TMN': '20', 'TMX': '25', 'SKY': '1', 'PTY': '0'}
+                if cat in ['TMN', 'TMX', 'SKY', 'PTY']:
+                    short_parsed[f_date][cat] = item['fcstValue']
+            
+            if now.hour < 6: tmFc = (now - timedelta(days=1)).strftime('%Y%m%d') + "1800"
+            else: tmFc = now.strftime('%Y%m%d') + "0600"
+            
+            url_mid_land = "http://apis.data.go.kr/1360000/MidFcstInfoService/getMidLandFcst"
+            url_mid_ta = "http://apis.data.go.kr/1360000/MidFcstInfoService/getMidTa"
+            
+            res_land = requests.get(url_mid_land, params={'ServiceKey': decoded_key, 'pageNo': '1', 'numOfRows': '10', 'dataType': 'JSON', 'regId': '11G00000', 'tmFc': tmFc}, timeout=3).json()
+            res_ta = requests.get(url_mid_ta, params={'ServiceKey': decoded_key, 'pageNo': '1', 'numOfRows': '10', 'dataType': 'JSON', 'regId': '11G00201', 'tmFc': tmFc}, timeout=3).json()
+            
+            mid_land_data = res_land['response']['body']['items']['item'][0]
+            mid_ta_data = res_ta['response']['body']['items']['item'][0]
+            
+            for i in range(7):
+                target_date = today + timedelta(days=i)
+                date_str = target_date.strftime('%Y%m%d')
+                display_date = target_date.strftime(f"%m/%d({weekdays_kr[target_date.weekday()]})")
+                
+                sky_emoji = "☀️ 맑음"
+                weather_status = "🟢 최적"
+                tmn, tmx = "24", "29"
+                
+                if i < 3 and date_str in short_parsed:
+                    day_data = short_parsed[date_str]
+                    tmn = str(float(day_data['TMN']))[:2] if day_data['TMN'] != '20' else '24'
+                    tmx = str(float(day_data['TMX']))[:2] if day_data['TMX'] != '25' else '29'
+                    sky_val, pty_val = day_data['SKY'], day_data['PTY']
+                    
+                    if pty_val in ['1', '2', '3', '4']: sky_emoji, weather_status = "🌧️ 비", "🔴 불가"
+                    elif sky_val == '4': sky_emoji, weather_status = "☁️ 흐림", "🟠 보통"
+                    elif sky_val == '3': sky_emoji, weather_status = "⛅ 구름", "🔵 양호"
+                
+                elif 3 <= i < 7:
+                    day_idx = i + 1
+                    tmn = str(mid_ta_data.get(f'taMin{day_idx}', '24'))
+                    tmx = str(mid_ta_data.get(f'taMax{day_idx}', '29'))
+                    wf_key = f'wf{day_idx}Pm' if day_idx > 7 else f'wf{day_idx}Am'
+                    wf_val = mid_land_data.get(wf_key, '맑음')
+                    
+                    if '비' in wf_val or '소나기' in wf_val: sky_emoji, weather_status = "🌧️ 비", "🔴 불가"
+                    elif '흐림' in wf_val: sky_emoji, weather_status = "☁️ 흐림", "🟠 보통"
+                    elif '구름' in wf_val: sky_emoji, weather_status = "⛅ 구름", "🔵 양호"
+                
+                forecast_data.append({
+                    "일자": display_date, "날씨": sky_emoji, "기온": f"{tmn}°/{tmx}°", "방제": weather_status
+                })
+            api_success = True
+            st.session_state.api_status = "🟢 기상청 데이터 실시간 연동 중"
             
     except Exception as e:
         st.session_state.api_status = "🟠 기상청 연동 대기 중 (자체 데이터 적용)"
         
-    for i in range(7):
-        dt = today + timedelta(days=i)
-        forecast_data.append({
-            "일자": dt.strftime(f"%m/%d({weekdays_kr[dt.weekday()]})"),
-            "날씨": fallback_pool[i][0],
-            "기온": fallback_pool[i][1],
-            "방제": fallback_pool[i][2]
-        })
-        
+    if not api_success:
+        forecast_data = []
+        for i in range(7):
+            dt = today + timedelta(days=i)
+            forecast_data.append({
+                "일자": dt.strftime(f"%m/%d({weekdays_kr[dt.weekday()]})"),
+                "날씨": fallback_pool[i][0], "기온": fallback_pool[i][1], "방제": fallback_pool[i][2]
+            })
+            
     return forecast_data
 
 def render_weather_section():
@@ -408,9 +430,6 @@ else:
                 st.rerun()
         st.stop()
 
-    # ----------------------------------------
-    # 메인 메뉴 렌더링
-    # ----------------------------------------
     menus = ["내가 필요한 농약 찾기", "농약명으로 찾기", "병해충명으로 찾기", "작용기작 찾기", "나의 방제이력", "병해충 분석", "정보교환마당"]
     menu_idx = menus.index(st.session_state.active_menu) if st.session_state.active_menu in menus else 0
     selected_menu = st.radio("메인 메뉴", menus, index=menu_idx, horizontal=True, label_visibility="collapsed")
@@ -458,7 +477,6 @@ else:
                     else: st.success(f"✅ 총 {len(filtered_df)}개의 약제가 검색되었습니다.")
 
             if 'df_result' in st.session_state and not st.session_state.df_result.empty:
-                # 💡 수정사항: 5개 더 보기 버튼 삭제하고, 전체 결과를 스크롤 가능한 테이블로 표시
                 render_styled_dataframe(st.session_state.df_result)
                 render_moa_popup_trigger(st.session_state.df_result)
 
@@ -526,14 +544,13 @@ else:
         col_limit, _ = st.columns([7, 3])
         with col_limit:
             st.subheader("🔬 작용기작 사전")
-            df_moa = load_moa_data()
-            if df_moa.empty: st.error("🚨 'kijak.xlsx' 파일을 읽을 수 없습니다.")
+            if df_moa_db.empty: st.error("🚨 DB에서 작용기작 정보를 불러올 수 없습니다.")
             else:
-                moa_codes = sorted([str(code).strip() for code in df_moa['표시기호'].unique() if str(code).strip()])
+                moa_codes = sorted([str(code).strip() for code in df_moa_db['표시기호'].unique() if str(code).strip() and str(code) != 'nan'])
                 search_moa = st.selectbox("궁금한 작용기작 코드 검색/선택:", options=moa_codes, index=None, placeholder="예: 가1, 1a, H01")
                 
                 if search_moa and search_moa.strip():
-                    res = df_moa[df_moa['표시기호'].astype(str) == search_moa].iloc[0]
+                    res = df_moa_db[df_moa_db['표시기호'].astype(str) == search_moa].iloc[0]
                     ntype = res.get('농약종류', '')
                     icon = "🛡️" if "살균" in ntype else ("🐛" if "살충" in ntype else ("🌿" if "제초" in ntype else "🧪"))
                     
@@ -550,15 +567,19 @@ else:
                     """, unsafe_allow_html=True)
 
     # ----------------------------------------
-    # 메뉴 5: 나의 방제이력
+    # 메뉴 5: 나의 방제이력 (Supabase 연동)
     # ----------------------------------------
     elif menu == "나의 방제이력":
         st.subheader("📋 나의 방제이력 (방제 일지)")
         
-        if st.session_state.spray_history.empty: st.info("아직 등록된 방제 이력이 없습니다. 아래에서 새로운 기록을 추가해보세요!")
+        df_history = fetch_spray_history()
+        
+        if df_history.empty: 
+            # 💡 기존 가상 데이터 포맷을 유지하여 초기 화면 구성 안내
+            st.info("아직 등록된 방제 이력이 없습니다. 아래에서 새로운 기록을 추가해보세요!")
+            st.dataframe(st.session_state.spray_history, hide_index=True)
         else:
-            display_df = st.session_state.spray_history.sort_values(by="방제일자", ascending=False)
-            styled_history = display_df.style.set_properties(**{'font-size': '14.5px', 'text-align': 'center', 'padding': '8px 10px', 'white-space': 'nowrap'})
+            styled_history = df_history.style.set_properties(**{'font-size': '14.5px', 'text-align': 'center', 'padding': '8px 10px', 'white-space': 'nowrap'})
             st.dataframe(styled_history, hide_index=True)
             
         st.markdown("<br>", unsafe_allow_html=True)
@@ -613,7 +634,7 @@ else:
                 st.markdown("<hr style='margin: 10px 0; border-style: dashed; border-color: #a5d6a7;'>", unsafe_allow_html=True)
                 records_to_add.append({"name": sel_name, "type": p_type, "moa": p_moa, "size": p_size, "qty": p_qty, "pest": p_pest, "family": p_family})
                 
-            if st.button("💾 입력한 방제 기록 일괄 저장하기", type="primary"):
+            if st.button("💾 입력한 방제 기록 DB에 일괄 저장하기", type="primary"):
                 valid = True
                 for idx, rec in enumerate(records_to_add):
                     if not rec['name']: st.error(f"⚠️ 약제 {idx+1}의 상품명을 선택하거나 검색해 주세요."); valid = False; break
@@ -623,17 +644,22 @@ else:
                     dt_str = h_date.strftime(f"%Y년 %m월 %d일({weekdays_kr[h_date.weekday()]})")
                     time_str = h_time.strftime("%H:%M")
                     
-                    new_dfs = []
+                    db_insert_data = []
                     for rec in records_to_add:
-                        new_dfs.append(pd.DataFrame([{
-                            "방제일자": dt_str, "방제시작": time_str, "작물명": h_crop, "총 살포량": f"{h_vol} {h_unit}",
+                        # 💡 수정사항: DB 저장 시 띄어쓰기로 인한 오류 방지를 위해 '총살포량'으로 통합
+                        db_insert_data.append({
+                            "방제일자": dt_str, "방제시작": time_str, "작물명": h_crop, "총살포량": f"{h_vol} {h_unit}",
                             "약제종류": rec['type'], "상품명": rec['name'], "작용기작": rec['moa'], "규격": rec['size'],
                             "수량": rec['qty'], "적용병해충": rec['pest'], "계통": rec['family'], "메모": h_memo
-                        }]))
+                        })
                     
-                    st.session_state.spray_history = pd.concat([st.session_state.spray_history] + new_dfs, ignore_index=True)
-                    st.success("✅ 혼용 방제 기록이 한 번에 깔끔하게 저장되었습니다!")
-                    st.rerun()
+                    try:
+                        supabase.table("DBbangje").insert(db_insert_data).execute()
+                        st.success("✅ 혼용 방제 기록이 안전하게 클라우드 DB에 저장되었습니다!")
+                        time.sleep(1.5)
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"🚨 저장 중 오류가 발생했습니다: {e}")
                     
             st.markdown("</div>", unsafe_allow_html=True)
 
