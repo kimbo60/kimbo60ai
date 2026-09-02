@@ -1,8 +1,10 @@
 # ==========================================
-# 📌 버전: 22.1 | 수정일시: 2026.09.02
+# 📌 버전: 23.0 | 수정일시: 2026.09.02
 # 📌 주요 수정내용: 
-#    1. 나의 방제이력 빈 데이터(Empty) 시 발생하는 AttributeError 수정 (빈 표출력으로 변경)
-#    2. Supabase 데이터 로딩 실패 시 에러 핸들링 안정화
+#    1. DBnongyak, DBbangje 테이블의 영문 필드명 구조 전면 반영
+#    2. DBkijak 테이블의 한글 필드명 구조 매핑 완료
+#    3. 방제이력 저장 시 시간(AM/PM) 및 날짜(YYYY-MM-DD) 포맷 동기화 및 자동 ID 부여
+#    4. 사용자 화면(UI) 출력 시 영문 필드를 직관적인 한글 열 제목으로 자동 변환
 # ==========================================
 
 import streamlit as st
@@ -153,7 +155,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 📊 Supabase 기반 데이터 로딩 함수 
+# 📊 Supabase 기반 데이터 로딩 함수 (수정된 필드명 반영)
 # ==========================================
 @st.cache_data
 def get_image_base64(path):
@@ -165,27 +167,35 @@ def get_image_base64(path):
 def load_data_from_supabase():
     if not supabase_connected: return pd.DataFrame(), pd.DataFrame(), [], []
     try:
+        # DBnongyak 호출
         response_nongyak = supabase.table("DBnongyak").select("*").execute()
         df = pd.DataFrame(response_nongyak.data).fillna('')
         
-        pesticide_raw = df["상품명"].astype(str).unique().tolist()
-        pesticide_list = sorted([name.strip() for name in pesticide_raw if name.strip() and str(name) != 'nan'])
+        pesticide_list, pest_list = [], []
         
-        pest_raw = df[df['종류'].isin(['살균제', '살충제'])]["적용병해충"].astype(str).tolist()
-        pest_set = {re.sub(r'\(.*?\)', '', p).replace('(', '').replace(')', '').strip() for pests in pest_raw for p in pests.split(',')}
-        pest_list = sorted([p for p in pest_set if p and str(p) != 'nan'])
+        if not df.empty:
+            if "Product Name" in df.columns:
+                pesticide_raw = df["Product Name"].astype(str).unique().tolist()
+                pesticide_list = sorted([name.strip() for name in pesticide_raw if name.strip() and str(name) != 'nan'])
+            
+            if "Type" in df.columns and "Byung" in df.columns:
+                pest_raw = df[df['Type'].isin(['살균제', '살충제'])]["Byung"].astype(str).tolist()
+                pest_set = {re.sub(r'\(.*?\)', '', p).replace('(', '').replace(')', '').strip() for pests in pest_raw for p in pests.split(',')}
+                pest_list = sorted([p for p in pest_set if p and str(p) != 'nan'])
         
+        # DBkijak 호출
         response_kijak = supabase.table("DBkijak").select("*").execute()
         df_moa = pd.DataFrame(response_kijak.data).fillna('')
         
         return df, df_moa, pesticide_list, pest_list
     except Exception as e:
+        print(f"데이터 로딩 에러: {e}")
         return pd.DataFrame(), pd.DataFrame(), [], []
 
 def fetch_spray_history():
     if not supabase_connected: return pd.DataFrame()
     try:
-        response = supabase.table("DBbangje").select("*").order("방제일자", desc=True).execute()
+        response = supabase.table("DBbangje").select("*").order("Date", desc=True).execute()
         return pd.DataFrame(response.data).fillna('')
     except:
         return pd.DataFrame()
@@ -193,9 +203,21 @@ def fetch_spray_history():
 df_database, df_moa_db, pesticide_list, pest_list = load_data_from_supabase()
 
 def render_styled_dataframe(df):
-    display_columns = ['종류', '상품명', '작용기작', '규격', '사용량', '금액 (원)', '적용병해충', '계통']
+    # 💡 화면 출력용으로 필터링 및 한글 열 제목 변환 로직
+    display_columns = ['Type', 'Product Name', 'Kijak', 'Spec', 'Usage', 'Price', 'Byung', 'Gyetong']
     df = df[[col for col in display_columns if col in df.columns]].copy()
-    if '금액 (원)' in df.columns: df['금액 (원)'] = pd.to_numeric(df['금액 (원)'], errors='coerce')
+    
+    # 숫자(콤마 포함 문자열) 변환 처리
+    if 'Price' in df.columns: 
+        df['Price'] = pd.to_numeric(df['Price'].astype(str).str.replace(',', ''), errors='coerce')
+    
+    # UI 출력을 위해 영문 필드명을 한글로 매핑
+    rename_dict = {
+        'Type': '종류', 'Product Name': '상품명', 'Kijak': '작용기작', 
+        'Spec': '규격', 'Usage': '사용량', 'Price': '금액 (원)', 
+        'Byung': '적용병해충', 'Gyetong': '계통'
+    }
+    df = df.rename(columns=rename_dict)
     
     styled_df = df.style.set_properties(**{'font-size': '15px', 'font-weight': '600', 'padding': '8px 10px', 'text-align': 'center'})
     left_cols = [c for c in df.columns if c in ['적용병해충', '계통']]
@@ -205,7 +227,8 @@ def render_styled_dataframe(df):
     st.dataframe(styled_df, hide_index=True, use_container_width=True, height=210)
 
 def render_moa_popup_trigger(df_current_result):
-    unique_moas = [m for m in df_current_result['작용기작'].dropna().unique() if str(m).strip() and str(m).strip() != 'nan']
+    # 필드명 변경 적용 ('작용기작' -> 'Kijak')
+    unique_moas = [m for m in df_current_result['Kijak'].dropna().unique() if str(m).strip() and str(m).strip() != 'nan']
     if unique_moas:
         st.markdown("<p style='font-size: 16px; font-weight: 800; color: #2e7d32; margin-top: 10px; margin-bottom: 5px;'>🔬 검색된 약제의 작용기작 상세정보 확인</p>", unsafe_allow_html=True)
         selected_moa = st.selectbox("아래에서 작용기작 코드를 선택하세요:", options=["선택 안 함"] + unique_moas, index=0, label_visibility="collapsed")
@@ -217,7 +240,7 @@ def render_moa_popup_trigger(df_current_result):
                 
             moa_list = [m.strip() for m in str(selected_moa).replace(',', '+').replace('/', '+').split('+') if m.strip()]
             for code in moa_list:
-                moa_result = df_moa_db[df_moa_db['표시기호'].astype(str) == code]
+                moa_result = df_moa_db[df_moa_db['작용기작 코드'].astype(str) == code]
                 if not moa_result.empty:
                     res = moa_result.iloc[0]
                     ntype = res.get('농약종류', '')
@@ -226,8 +249,8 @@ def render_moa_popup_trigger(df_current_result):
                     st.markdown(f"""
                     <div class='moa-result-card'>
                         <h4>{code} <span style='font-size: 14px; font-weight: normal; opacity: 0.8;'>({icon} {ntype})</span></h4>
-                        <p class='title'>{res.get('작용기작 구분', '')}</p>
-                        <p class='desc'>👉 {res.get('세부 작용기작 및 계통(성분)', '')}</p>
+                        <p class='title'>{res.get('주 작용기작', '')}</p>
+                        <p class='desc'>👉 {res.get('세부 작용기작', '')}</p>
                     </div>
                     """, unsafe_allow_html=True)
                 else:
@@ -439,6 +462,14 @@ else:
 
     menu = st.session_state.active_menu
     st.markdown("<br>", unsafe_allow_html=True)
+    
+    if supabase_connected:
+        if df_database.empty:
+            st.warning("⚠️ **[데이터 로딩 실패]** Supabase에서 데이터를 불러오지 못했습니다. \n\n 1) `DBnongyak`, `DBkijak`의 **Disable RLS** 설정이 잘 되었는지 확인해주세요.\n 2) 설정이 맞다면 앱 우측 상단 `⋮` 버튼을 누르고 **[Clear cache]**를 클릭해주세요.")
+        elif not pesticide_list:
+            st.error("🚨 **[컬럼명 불일치 오류]** DB 테이블에 `Product Name`, `Type`, `Byung` 이라는 이름의 필드가 정확히 존재하는지 확인해주세요.")
+        if df_moa_db.empty:
+            st.warning("⚠️ **[작용기작 데이터 없음]** `DBkijak` 테이블에서 데이터를 불러올 수 없습니다. RLS 설정 및 데이터 존재 여부를 확인해주세요.")
 
     # ----------------------------------------
     # 메뉴 1: 내가 필요한 농약 찾기
@@ -469,8 +500,9 @@ else:
                 if not desired_pesticide and not target_pest: st.error("⚠️ 희망 약제명 또는 발생 병해충을 하나 이상 검색/선택해 주세요.")
                 else:
                     filtered_df = df_database.copy()
-                    if target_pest: filtered_df = filtered_df[filtered_df['적용병해충'].astype(str).str.contains('|'.join(target_pest))]
-                    if desired_pesticide: filtered_df = filtered_df[filtered_df['상품명'].isin(desired_pesticide)]
+                    # 필드명 변경 적용 ('적용병해충' -> 'Byung')
+                    if target_pest: filtered_df = filtered_df[filtered_df['Byung'].astype(str).str.contains('|'.join(target_pest))]
+                    if desired_pesticide: filtered_df = filtered_df[filtered_df['Product Name'].isin(desired_pesticide)]
                     st.session_state.df_result = filtered_df
                     if filtered_df.empty: st.error("조건에 맞는 약제가 없습니다.")
                     else: st.success(f"✅ 총 {len(filtered_df)}개의 약제가 검색되었습니다.")
@@ -495,7 +527,8 @@ else:
                 st.markdown("<hr style='border: 1px dashed #cccccc; margin: 30px 0;'>", unsafe_allow_html=True)
                 
                 if search_val and search_val.strip():
-                    res = df_database[df_database['상품명'].astype(str) == search_val]
+                    # 필드명 변경 적용 ('상품명' -> 'Product Name')
+                    res = df_database[df_database['Product Name'].astype(str) == search_val]
                     
                     if res.empty:
                         st.error("찾을 수 없습니다. 다시 입력해주세요!")
@@ -514,7 +547,7 @@ else:
                 if search_vals:
                     res = df_database.copy()
                     for val in search_vals:
-                        res = res[res['적용병해충'].astype(str).str.contains(val)]
+                        res = res[res['Byung'].astype(str).str.contains(val)]
                     
                     if res.empty:
                         if len(search_vals) > 1:
@@ -522,9 +555,9 @@ else:
                             st.markdown("#### 💡 각 병해충 조건별 적용 가능한 농약")
                             
                             for val in search_vals:
-                                individual_res = df_database[df_database['적용병해충'].astype(str).str.contains(val)]
+                                individual_res = df_database[df_database['Byung'].astype(str).str.contains(val)]
                                 if not individual_res.empty:
-                                    pesticides_str = ", ".join(individual_res['상품명'].unique().tolist())
+                                    pesticides_str = ", ".join(individual_res['Product Name'].unique().tolist())
                                     st.info(f"**[{val}]** : {pesticides_str}")
                                 else:
                                     st.warning(f"**[{val}]** : 등록된 농약이 없습니다.")
@@ -545,11 +578,11 @@ else:
             st.subheader("🔬 작용기작 사전")
             if df_moa_db.empty: st.error("🚨 DB에서 작용기작 정보를 불러올 수 없습니다. (Supabase에서 Disable RLS 처리를 확인해주세요.)")
             else:
-                moa_codes = sorted([str(code).strip() for code in df_moa_db['표시기호'].unique() if str(code).strip() and str(code) != 'nan'])
+                moa_codes = sorted([str(code).strip() for code in df_moa_db['작용기작 코드'].unique() if str(code).strip() and str(code) != 'nan'])
                 search_moa = st.selectbox("궁금한 작용기작 코드 검색/선택:", options=moa_codes, index=None, placeholder="예: 가1, 1a, H01")
                 
                 if search_moa and search_moa.strip():
-                    res = df_moa_db[df_moa_db['표시기호'].astype(str) == search_moa].iloc[0]
+                    res = df_moa_db[df_moa_db['작용기작 코드'].astype(str) == search_moa].iloc[0]
                     ntype = res.get('농약종류', '')
                     icon = "🛡️" if "살균" in ntype else ("🐛" if "살충" in ntype else ("🌿" if "제초" in ntype else "🧪"))
                     
@@ -560,8 +593,8 @@ else:
                             <span style='background-color: #e65100; color: white; padding: 5px 15px; border-radius: 12px;'>{search_moa}</span><span class='moa-highlight' style='margin-left: 10px;'>작용기작 상세</span>
                         </h2>
                         <div class='moa-inner type'><p style='margin: 0; font-size: 14px; opacity: 0.8;'>분류 (농약종류)</p><p style='margin: 0; font-size: 20px; font-weight: 800;'>{icon} {ntype}</p></div>
-                        <div class='moa-inner desc'><p style='margin: 0; font-size: 14px; opacity: 0.8;'>작용기작 구분 (대분류)</p><p style='margin: 0; font-size: 20px; font-weight: 800;'>🧬 {res.get('작용기작 구분', '')}</p></div>
-                        <div class='moa-inner detail'><p style='margin: 0; font-size: 15px; font-weight: 800; margin-bottom: 8px;'>세부 작용기작 및 계통(성분)</p><p style='margin: 0; font-size: 24px; color: #e57373; font-weight: 900; line-height: 1.4;'>🔬 {res.get('세부 작용기작 및 계통(성분)', '')}</p></div>
+                        <div class='moa-inner desc'><p style='margin: 0; font-size: 14px; opacity: 0.8;'>작용기작 구분 (대분류)</p><p style='margin: 0; font-size: 20px; font-weight: 800;'>🧬 {res.get('주 작용기작', '')}</p></div>
+                        <div class='moa-inner detail'><p style='margin: 0; font-size: 15px; font-weight: 800; margin-bottom: 8px;'>세부 작용기작 및 계통(성분)</p><p style='margin: 0; font-size: 24px; color: #e57373; font-weight: 900; line-height: 1.4;'>🔬 {res.get('세부 작용기작', '')}</p></div>
                     </div>
                     """, unsafe_allow_html=True)
 
@@ -573,15 +606,25 @@ else:
         
         df_history = fetch_spray_history()
         
-        # 💡 수정사항: DB에 내용이 없을 때 에러가 나지 않도록 빈 표(컬럼만 있는 상태)를 보여줍니다.
         if df_history.empty: 
             st.info("아직 등록된 방제 이력이 없습니다. (아래에서 새로운 기록을 추가해보세요!)")
-            empty_columns = ["방제일자", "방제시작", "작물명", "총살포량", "약제종류", "상품명", "작용기작", "규격", "수량", "적용병해충", "계통", "메모"]
+            empty_columns = ["Date", "Time", "Nongyak", "Type", "Kijak", "Spec", "Qty", "Tqty", "Byung", "Remark"]
             empty_df = pd.DataFrame(columns=empty_columns)
             styled_empty = empty_df.style.set_properties(**{'font-size': '14.5px', 'text-align': 'center', 'padding': '8px 10px', 'white-space': 'nowrap'})
             st.dataframe(styled_empty, hide_index=True)
         else:
-            styled_history = df_history.style.set_properties(**{'font-size': '14.5px', 'text-align': 'center', 'padding': '8px 10px', 'white-space': 'nowrap'})
+            display_history = df_history.copy()
+            # UI에 보여주기 위해 필드명을 다시 한글로 매핑
+            rename_hist = {
+                'Date': '방제일자', 'Time': '방제시간', 'Nongyak': '약제명',
+                'Type': '종류', 'Kijak': '작용기작', 'Spec': '규격',
+                'Qty': '수량', 'Tqty': '총살포량', 'Byung': '적용병해충', 'Remark': '메모'
+            }
+            display_history = display_history.rename(columns=rename_hist)
+            if 'ID' in display_history.columns:
+                display_history = display_history.drop(columns=['ID']) # 화면에서 ID는 숨김처리
+                
+            styled_history = display_history.style.set_properties(**{'font-size': '14.5px', 'text-align': 'center', 'padding': '8px 10px', 'white-space': 'nowrap'})
             st.dataframe(styled_history, hide_index=True)
             
         st.markdown("<br>", unsafe_allow_html=True)
@@ -617,10 +660,10 @@ else:
                 
                 d_type, d_moa, d_size, d_pest, d_family = "", "", "", "", ""
                 if sel_name:
-                    db_row = df_database[df_database['상품명'] == sel_name]
+                    db_row = df_database[df_database['Product Name'] == sel_name]
                     if not db_row.empty:
                         r = db_row.iloc[0]
-                        d_type, d_moa, d_size, d_pest, d_family = str(r.get('종류','')), str(r.get('작용기작','')), str(r.get('규격','')), str(r.get('적용병해충','')), str(r.get('계통',''))
+                        d_type, d_moa, d_size, d_pest, d_family = str(r.get('Type','')), str(r.get('Kijak','')), str(r.get('Spec','')), str(r.get('Byung','')), str(r.get('Gyetong',''))
                         
                 col_p1, col_p2, col_p3 = st.columns(3)
                 with col_p1: p_type = st.text_input(f"약제종류", value=d_type, key=f"p_type_{i}")
@@ -642,16 +685,25 @@ else:
                     if not rec['name']: st.error(f"⚠️ 약제 {idx+1}의 상품명을 선택하거나 검색해 주세요."); valid = False; break
                 
                 if valid:
-                    weekdays_kr = ['월', '화', '수', '목', '금', '토', '일']
-                    dt_str = h_date.strftime(f"%Y년 %m월 %d일({weekdays_kr[h_date.weekday()]})")
-                    time_str = h_time.strftime("%H:%M")
+                    # 💡 수정사항: 이미지에 표기된 날짜/시간(AM/PM) 포맷 및 영문 필드 구조 반영
+                    dt_str = h_date.strftime("%Y-%m-%d")
+                    time_str = h_time.strftime("%I:%M %p").lstrip('0')
+                    base_id = int(datetime.now().strftime("%y%m%d%H%M%S")) # 고유 ID 부여
                     
                     db_insert_data = []
-                    for rec in records_to_add:
+                    for idx, rec in enumerate(records_to_add):
                         db_insert_data.append({
-                            "방제일자": dt_str, "방제시작": time_str, "작물명": h_crop, "총살포량": f"{h_vol} {h_unit}",
-                            "약제종류": rec['type'], "상품명": rec['name'], "작용기작": rec['moa'], "규격": rec['size'],
-                            "수량": rec['qty'], "적용병해충": rec['pest'], "계통": rec['family'], "메모": h_memo
+                            "ID": base_id + idx, 
+                            "Date": dt_str,
+                            "Time": time_str,
+                            "Nongyak": rec['name'],
+                            "Type": rec['type'],
+                            "Kijak": rec['moa'],
+                            "Spec": rec['size'],
+                            "Qty": rec['qty'],
+                            "Tqty": str(h_vol),
+                            "Byung": rec['pest'],
+                            "Remark": h_memo
                         })
                     
                     try:
