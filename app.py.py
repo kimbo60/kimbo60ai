@@ -1,10 +1,9 @@
 # ==========================================
-# 📌 버전: 23.0 | 수정일시: 2026.09.02
+# 📌 버전: 23.1 | 수정일시: 2026.09.02
 # 📌 주요 수정내용: 
-#    1. DBnongyak, DBbangje 테이블의 영문 필드명 구조 전면 반영
-#    2. DBkijak 테이블의 한글 필드명 구조 매핑 완료
-#    3. 방제이력 저장 시 시간(AM/PM) 및 날짜(YYYY-MM-DD) 포맷 동기화 및 자동 ID 부여
-#    4. 사용자 화면(UI) 출력 시 영문 필드를 직관적인 한글 열 제목으로 자동 변환
+#    1. 데이터 로딩 독립화: DBkijak에 오류가 있어도 DBnongyak은 정상 출력되도록 분리
+#    2. 필드명 자동 교정: CSV 변환 시 섞여 들어간 보이지 않는 공백 및 대소문자 오류 자동 보정
+#    3. 스마트 진단 시스템: 에러 발생 시 어느 테이블, 어떤 필드에서 문제가 발생했는지 화면에 출력
 # ==========================================
 
 import streamlit as st
@@ -59,7 +58,6 @@ if 'active_menu' not in st.session_state:
 st.markdown("""
     <style>
     a.home-link { text-decoration: none !important; }
-    
     ::-webkit-scrollbar { width: 18px !important; height: 18px !important; }
     ::-webkit-scrollbar-track { background: #f1f1f1 !important; border-radius: 10px !important; box-shadow: inset 0 0 5px rgba(0,0,0,0.1) !important; }
     ::-webkit-scrollbar-thumb { background: #ffb74d !important; border-radius: 10px !important; border: 3px solid #f1f1f1 !important; }
@@ -111,7 +109,6 @@ st.markdown("""
         ::-webkit-scrollbar-track { background: #2c2c2c !important; border: 3px solid #3b3b3b !important; }
         ::-webkit-scrollbar-thumb { background: #ff9800 !important; border: 3px solid #2c2c2c !important; }
         ::-webkit-scrollbar-thumb:hover { background: #e65100 !important; }
-        
         input[type="text"], input[type="password"], div[data-baseweb="select"] > div, div[data-testid="stDateInput"] > div, div[data-testid="stTimeInput"] > div, textarea { background-color: #3b3b3b !important; border: 1px solid #555555 !important; color: #f1f1f1 !important; }
         div[data-testid="stForm"] { background-color: #1e1e1e !important; border-color: #555 !important; }
         div[data-testid="stForm"] label p, div[data-testid="stExpander"] p { color: #e0e0e0 !important; }
@@ -121,7 +118,6 @@ st.markdown("""
         .card-moa { background-color: #2c3e30; border-color: #4CAF50; }
         .moa-inner.type, .moa-inner.desc, .moa-inner.detail { background-color: #383838; color: #e0e0e0; }
         h4, h3, h2, p { color: #e0e0e0 !important; }
-        
         .moa-result-card { background-color: #2c3e30; color: #e0e0e0; }
         .moa-result-card h4 { color: #a5d6a7; }
         .moa-result-card p.title { color: #e0e0e0; }
@@ -129,7 +125,6 @@ st.markdown("""
         .ai-result-card { background-color: #3e2723; border-color: #ffb74d; color: #e0e0e0; }
         .ai-result-card h3 { color: #ffb74d; }
         .ai-result-card p { color: #a5d6a7; }
-        
         .search-header-pest { background: linear-gradient(to right, #1b5e20, transparent); }
         .search-header-pest h3 { color: #a5d6a7; }
         .search-header-bug { background: linear-gradient(to right, #4e342e, transparent); }
@@ -147,7 +142,6 @@ st.markdown("""
         div[data-testid="stForm"] { padding: 15px !important; border-radius: 10px !important; border-width: 2px !important; }
         button[kind="secondaryFormSubmit"], button[kind="primary"] { font-size: 18px !important; padding: 10px !important; margin-top: 10px !important; }
         .custom-card { padding: 15px !important; }
-        
         div[data-testid="stHorizontalBlock"]:has(input[placeholder="예: 1000"]) { display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important; gap: 8px !important; }
         div[data-testid="stHorizontalBlock"]:has(input[placeholder="예: 1000"]) > div[data-testid="column"] { width: 50% !important; min-width: 0 !important; flex: 1 1 auto !important; }
     }
@@ -155,7 +149,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 📊 Supabase 기반 데이터 로딩 함수 (수정된 필드명 반영)
+# 📊 Supabase 기반 데이터 로딩 및 자동 교정 함수
 # ==========================================
 @st.cache_data
 def get_image_base64(path):
@@ -165,53 +159,106 @@ def get_image_base64(path):
 
 @st.cache_data(ttl=600)
 def load_data_from_supabase():
-    if not supabase_connected: return pd.DataFrame(), pd.DataFrame(), [], []
+    if not supabase_connected: return pd.DataFrame(), pd.DataFrame(), [], [], "Supabase 연결 실패"
+    
+    df_nongyak, df_moa = pd.DataFrame(), pd.DataFrame()
+    pesticide_list, pest_list = [], []
+    error_msgs = []
+    
+    # 💡 1. DBnongyak 독립적 로딩 및 자동 필드명 교정
     try:
-        # DBnongyak 호출
-        response_nongyak = supabase.table("DBnongyak").select("*").execute()
-        df = pd.DataFrame(response_nongyak.data).fillna('')
+        res_n = supabase.table("DBnongyak").select("*").execute()
+        df_nongyak = pd.DataFrame(res_n.data)
         
-        pesticide_list, pest_list = [], []
-        
-        if not df.empty:
-            if "Product Name" in df.columns:
-                pesticide_raw = df["Product Name"].astype(str).unique().tolist()
-                pesticide_list = sorted([name.strip() for name in pesticide_raw if name.strip() and str(name) != 'nan'])
+        if not df_nongyak.empty:
+            # 보이지 않는 공백 제거나 대소문자 차이를 보정하기 위해 필드명 통일화 작업 수행
+            cols_map = {}
+            for c in df_nongyak.columns:
+                clean_c = c.strip().lower().replace(" ", "").replace("_", "")
+                if clean_c == 'productname': cols_map[c] = 'Product Name'
+                elif clean_c == 'type': cols_map[c] = 'Type'
+                elif clean_c == 'kijak': cols_map[c] = 'Kijak'
+                elif clean_c == 'spec': cols_map[c] = 'Spec'
+                elif clean_c == 'usage': cols_map[c] = 'Usage'
+                elif clean_c == 'price': cols_map[c] = 'Price'
+                elif clean_c == 'byung': cols_map[c] = 'Byung'
+                elif clean_c == 'gyetong': cols_map[c] = 'Gyetong'
+            df_nongyak = df_nongyak.rename(columns=cols_map).fillna('')
             
-            if "Type" in df.columns and "Byung" in df.columns:
-                pest_raw = df[df['Type'].isin(['살균제', '살충제'])]["Byung"].astype(str).tolist()
+            # 목록 데이터 추출
+            if "Product Name" in df_nongyak.columns:
+                pesticide_list = sorted([str(n).strip() for n in df_nongyak["Product Name"].unique() if str(n).strip() and str(n) != 'nan'])
+            else:
+                error_msgs.append(f"DBnongyak 'Product Name' 필드 인식 실패 (현재: {list(df_nongyak.columns)})")
+                
+            if "Type" in df_nongyak.columns and "Byung" in df.nongyak.columns:
+                pest_raw = df_nongyak[df_nongyak['Type'].isin(['살균제', '살충제'])]["Byung"].astype(str).tolist()
                 pest_set = {re.sub(r'\(.*?\)', '', p).replace('(', '').replace(')', '').strip() for pests in pest_raw for p in pests.split(',')}
                 pest_list = sorted([p for p in pest_set if p and str(p) != 'nan'])
-        
-        # DBkijak 호출
-        response_kijak = supabase.table("DBkijak").select("*").execute()
-        df_moa = pd.DataFrame(response_kijak.data).fillna('')
-        
-        return df, df_moa, pesticide_list, pest_list
+            else:
+                error_msgs.append("DBnongyak 'Type' 또는 'Byung' 필드 인식 실패")
+        else:
+            error_msgs.append("DBnongyak 테이블에 데이터가 존재하지 않습니다.")
     except Exception as e:
-        print(f"데이터 로딩 에러: {e}")
-        return pd.DataFrame(), pd.DataFrame(), [], []
+        error_msgs.append(f"DBnongyak 에러: {e}")
+
+    # 💡 2. DBkijak 독립적 로딩 및 자동 필드명 교정
+    try:
+        res_k = supabase.table("DBkijak").select("*").execute()
+        df_moa = pd.DataFrame(res_k.data)
+        
+        if not df_moa.empty:
+            cols_map_moa = {}
+            for c in df_moa.columns:
+                clean_c = c.strip().replace(" ", "")
+                if clean_c == '작용기작코드': cols_map_moa[c] = '작용기작 코드'
+                elif clean_c == '농약종류': cols_map_moa[c] = '농약종류'
+                elif clean_c == '주작용기작': cols_map_moa[c] = '주 작용기작'
+                elif clean_c == '세부작용기작': cols_map_moa[c] = '세부 작용기작'
+            df_moa = df_moa.rename(columns=cols_map_moa).fillna('')
+        else:
+            error_msgs.append("DBkijak 테이블에 데이터가 존재하지 않습니다.")
+    except Exception as e:
+        error_msgs.append(f"DBkijak 에러: {e}")
+
+    error_str = " | ".join(error_msgs) if error_msgs else ""
+    return df_nongyak, df_moa, pesticide_list, pest_list, error_str
 
 def fetch_spray_history():
     if not supabase_connected: return pd.DataFrame()
     try:
         response = supabase.table("DBbangje").select("*").order("Date", desc=True).execute()
-        return pd.DataFrame(response.data).fillna('')
-    except:
+        df = pd.DataFrame(response.data)
+        if not df.empty:
+            # 방제이력 테이블 필드명 자동 교정
+            cols_map = {}
+            for c in df.columns:
+                clean_c = c.strip().lower().replace(" ", "")
+                if clean_c == 'date': cols_map[c] = 'Date'
+                elif clean_c == 'time': cols_map[c] = 'Time'
+                elif clean_c == 'nongyak': cols_map[c] = 'Nongyak'
+                elif clean_c == 'type': cols_map[c] = 'Type'
+                elif clean_c == 'kijak': cols_map[c] = 'Kijak'
+                elif clean_c == 'spec': cols_map[c] = 'Spec'
+                elif clean_c == 'qty': cols_map[c] = 'Qty'
+                elif clean_c == 'tqty': cols_map[c] = 'Tqty'
+                elif clean_c == 'byung': cols_map[c] = 'Byung'
+                elif clean_c == 'remark': cols_map[c] = 'Remark'
+                elif clean_c == 'id': cols_map[c] = 'ID'
+            df = df.rename(columns=cols_map)
+        return df.fillna('')
+    except Exception as e:
         return pd.DataFrame()
 
-df_database, df_moa_db, pesticide_list, pest_list = load_data_from_supabase()
+df_database, df_moa_db, pesticide_list, pest_list, db_error_msg = load_data_from_supabase()
 
 def render_styled_dataframe(df):
-    # 💡 화면 출력용으로 필터링 및 한글 열 제목 변환 로직
     display_columns = ['Type', 'Product Name', 'Kijak', 'Spec', 'Usage', 'Price', 'Byung', 'Gyetong']
     df = df[[col for col in display_columns if col in df.columns]].copy()
     
-    # 숫자(콤마 포함 문자열) 변환 처리
     if 'Price' in df.columns: 
         df['Price'] = pd.to_numeric(df['Price'].astype(str).str.replace(',', ''), errors='coerce')
     
-    # UI 출력을 위해 영문 필드명을 한글로 매핑
     rename_dict = {
         'Type': '종류', 'Product Name': '상품명', 'Kijak': '작용기작', 
         'Spec': '규격', 'Usage': '사용량', 'Price': '금액 (원)', 
@@ -227,15 +274,15 @@ def render_styled_dataframe(df):
     st.dataframe(styled_df, hide_index=True, use_container_width=True, height=210)
 
 def render_moa_popup_trigger(df_current_result):
-    # 필드명 변경 적용 ('작용기작' -> 'Kijak')
+    if 'Kijak' not in df_current_result.columns: return
     unique_moas = [m for m in df_current_result['Kijak'].dropna().unique() if str(m).strip() and str(m).strip() != 'nan']
     if unique_moas:
         st.markdown("<p style='font-size: 16px; font-weight: 800; color: #2e7d32; margin-top: 10px; margin-bottom: 5px;'>🔬 검색된 약제의 작용기작 상세정보 확인</p>", unsafe_allow_html=True)
         selected_moa = st.selectbox("아래에서 작용기작 코드를 선택하세요:", options=["선택 안 함"] + unique_moas, index=0, label_visibility="collapsed")
         
         if selected_moa != "선택 안 함":
-            if df_moa_db.empty:
-                st.error("🚨 작용기작 DB 정보를 불러올 수 없습니다. (Supabase RLS 설정 해제를 확인해주세요.)")
+            if df_moa_db.empty or '작용기작 코드' not in df_moa_db.columns:
+                st.error("🚨 작용기작 DB 정보를 찾을 수 없습니다. 필드명이 올바른지 확인해주세요.")
                 return
                 
             moa_list = [m.strip() for m in str(selected_moa).replace(',', '+').replace('/', '+').split('+') if m.strip()]
@@ -273,7 +320,6 @@ def fetch_kma_weather_7days():
     forecast_data = []
     today = date.today()
     weekdays_kr = ['월', '화', '수', '목', '금', '토', '일']
-    
     fallback_pool = [("☀️ 맑음", "24°/29°", "🟢 최적"), ("⛅ 구름", "25°/30°", "🔵 양호"), ("☁️ 흐림", "23°/26°", "🟠 보통"), ("🌧️ 비", "24°/27°", "🔴 불가"), ("☀️ 맑음", "25°/30°", "🟢 최적"), ("🌦️ 소나기", "24°/28°", "🟠 주의"), ("⛅ 구름", "26°/31°", "🔵 양호")]
     api_success = False
 
@@ -281,7 +327,6 @@ def fetch_kma_weather_7days():
         api_key = "6DtMoZ7RNwMuQb64EEqZluq%2B6gZJjLxP%2Fyfr3yBrx9l9EAxzw0IF%2B0nFzzTJLNvLbL92qCLArCTesMh4QKZ0Fg%3D%3D"
         decoded_key = urllib.parse.unquote(api_key)
         now = datetime.now()
-        
         base_dt = now - timedelta(days=1)
         base_date = base_dt.strftime('%Y%m%d')
         base_time = "2300"
@@ -289,8 +334,7 @@ def fetch_kma_weather_7days():
         url_short = "http://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getVilageFcst"
         params_short = {
             'ServiceKey': decoded_key, 'pageNo': '1', 'numOfRows': '1000',
-            'dataType': 'JSON', 'base_date': base_date, 'base_time': base_time,
-            'nx': '53', 'ny': '38' 
+            'dataType': 'JSON', 'base_date': base_date, 'base_time': base_time, 'nx': '53', 'ny': '38' 
         }
         res_short = requests.get(url_short, params=params_short, timeout=3).json()
         
@@ -322,8 +366,7 @@ def fetch_kma_weather_7days():
                 date_str = target_date.strftime('%Y%m%d')
                 display_date = target_date.strftime(f"%m/%d({weekdays_kr[target_date.weekday()]})")
                 
-                sky_emoji = "☀️ 맑음"
-                weather_status = "🟢 최적"
+                sky_emoji, weather_status = "☀️ 맑음", "🟢 최적"
                 tmn, tmx = "24", "29"
                 
                 if i < 3 and date_str in short_parsed:
@@ -331,7 +374,6 @@ def fetch_kma_weather_7days():
                     tmn = str(float(day_data['TMN']))[:2] if day_data['TMN'] != '20' else '24'
                     tmx = str(float(day_data['TMX']))[:2] if day_data['TMX'] != '25' else '29'
                     sky_val, pty_val = day_data['SKY'], day_data['PTY']
-                    
                     if pty_val in ['1', '2', '3', '4']: sky_emoji, weather_status = "🌧️ 비", "🔴 불가"
                     elif sky_val == '4': sky_emoji, weather_status = "☁️ 흐림", "🟠 보통"
                     elif sky_val == '3': sky_emoji, weather_status = "⛅ 구름", "🔵 양호"
@@ -342,14 +384,11 @@ def fetch_kma_weather_7days():
                     tmx = str(mid_ta_data.get(f'taMax{day_idx}', '29'))
                     wf_key = f'wf{day_idx}Pm' if day_idx > 7 else f'wf{day_idx}Am'
                     wf_val = mid_land_data.get(wf_key, '맑음')
-                    
                     if '비' in wf_val or '소나기' in wf_val: sky_emoji, weather_status = "🌧️ 비", "🔴 불가"
                     elif '흐림' in wf_val: sky_emoji, weather_status = "☁️ 흐림", "🟠 보통"
                     elif '구름' in wf_val: sky_emoji, weather_status = "⛅ 구름", "🔵 양호"
                 
-                forecast_data.append({
-                    "일자": display_date, "날씨": sky_emoji, "기온": f"{tmn}°/{tmx}°", "방제": weather_status
-                })
+                forecast_data.append({"일자": display_date, "날씨": sky_emoji, "기온": f"{tmn}°/{tmx}°", "방제": weather_status})
             api_success = True
             st.session_state.api_status = "🟢 기상청 데이터 실시간 연동 중"
             
@@ -360,10 +399,7 @@ def fetch_kma_weather_7days():
         forecast_data = []
         for i in range(7):
             dt = today + timedelta(days=i)
-            forecast_data.append({
-                "일자": dt.strftime(f"%m/%d({weekdays_kr[dt.weekday()]})"),
-                "날씨": fallback_pool[i][0], "기온": fallback_pool[i][1], "방제": fallback_pool[i][2]
-            })
+            forecast_data.append({"일자": dt.strftime(f"%m/%d({weekdays_kr[dt.weekday()]})"), "날씨": fallback_pool[i][0], "기온": fallback_pool[i][1], "방제": fallback_pool[i][2]})
             
     return forecast_data
 
@@ -383,25 +419,20 @@ def render_weather_section():
     
     styled_weather = pd.DataFrame(forecast_data).style.set_properties(**{'font-size': '13.5px', 'font-weight': '600', 'text-align': 'center', 'padding': '6px 5px'})
     st.dataframe(styled_weather, hide_index=True, use_container_width=True)
-    
     if os.path.exists("farm.gif"): st.image("farm.gif", use_container_width=True)
     elif os.path.exists("farm.png"): st.image("farm.png", use_container_width=True)
-    
     st.markdown("<p style='text-align: center; color: #388e3c; font-size: 16px; font-weight: bold; margin-top: 10px;'>언제나 싱그러운 과수원</p>", unsafe_allow_html=True)
 
 # ==========================================
 # 🚀 헤더 영역 (로고 및 로그인 UI)
 # ==========================================
 col_logo, col_login = st.columns([7, 3])
-
 with col_logo:
     icon_base64 = get_image_base64("아이콘001.png")
     icon_tag = f'<img src="{icon_base64}" width="60" style="vertical-align: middle; margin-right: 15px; filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.3));">' if icon_base64 else '🍊'
     st.markdown(f"<a href='/' target='_self' class='home-link'><div class='hallabong-title'>{icon_tag} 내가 찾는 농약</div></a>", unsafe_allow_html=True)
-
 with col_login:
     st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
-    
     if st.session_state.logged_in:
         st.markdown(f"<div style='text-align: right; font-size: 16px; margin-bottom: 5px;'><b>{st.session_state.current_user.get('name')}</b>님 환영합니다!</div>", unsafe_allow_html=True)
         if st.button("로그아웃", use_container_width=True):
@@ -410,7 +441,6 @@ with col_login:
             st.rerun()
     else:
         login_mode = st.radio("접속 방식", ["비회원", "로그인"], horizontal=True, label_visibility="collapsed", key="login_mode")
-
 st.markdown("<hr style='margin-top: 10px; margin-bottom: 15px;'>", unsafe_allow_html=True)
 
 # ==========================================
@@ -429,9 +459,7 @@ if st.session_state.get('login_mode') == "로그인" and not st.session_state.lo
         if st.form_submit_button("로그인 / 가입하기", type="primary"):
             if user_id and password and name:
                 st.session_state.logged_in = True
-                st.session_state.current_user = {
-                    'name': name, 'id': user_id, 'location': location, 'crop': crop
-                }
+                st.session_state.current_user = {'name': name, 'id': user_id, 'location': location, 'crop': crop}
                 st.session_state.show_history_prompt = True
                 st.rerun()
             else:
@@ -463,13 +491,9 @@ else:
     menu = st.session_state.active_menu
     st.markdown("<br>", unsafe_allow_html=True)
     
-    if supabase_connected:
-        if df_database.empty:
-            st.warning("⚠️ **[데이터 로딩 실패]** Supabase에서 데이터를 불러오지 못했습니다. \n\n 1) `DBnongyak`, `DBkijak`의 **Disable RLS** 설정이 잘 되었는지 확인해주세요.\n 2) 설정이 맞다면 앱 우측 상단 `⋮` 버튼을 누르고 **[Clear cache]**를 클릭해주세요.")
-        elif not pesticide_list:
-            st.error("🚨 **[컬럼명 불일치 오류]** DB 테이블에 `Product Name`, `Type`, `Byung` 이라는 이름의 필드가 정확히 존재하는지 확인해주세요.")
-        if df_moa_db.empty:
-            st.warning("⚠️ **[작용기작 데이터 없음]** `DBkijak` 테이블에서 데이터를 불러올 수 없습니다. RLS 설정 및 데이터 존재 여부를 확인해주세요.")
+    # 💡 3. 스마트 진단 메시지 출력부 (문제 발생 시 화면에 정확히 안내)
+    if supabase_connected and db_error_msg:
+        st.error(f"🚨 **[DB 진단 메시지]** 데이터를 불러오는 중 문제가 발생했습니다: \n\n {db_error_msg}")
 
     # ----------------------------------------
     # 메뉴 1: 내가 필요한 농약 찾기
@@ -500,7 +524,6 @@ else:
                 if not desired_pesticide and not target_pest: st.error("⚠️ 희망 약제명 또는 발생 병해충을 하나 이상 검색/선택해 주세요.")
                 else:
                     filtered_df = df_database.copy()
-                    # 필드명 변경 적용 ('적용병해충' -> 'Byung')
                     if target_pest: filtered_df = filtered_df[filtered_df['Byung'].astype(str).str.contains('|'.join(target_pest))]
                     if desired_pesticide: filtered_df = filtered_df[filtered_df['Product Name'].isin(desired_pesticide)]
                     st.session_state.df_result = filtered_df
@@ -527,11 +550,8 @@ else:
                 st.markdown("<hr style='border: 1px dashed #cccccc; margin: 30px 0;'>", unsafe_allow_html=True)
                 
                 if search_val and search_val.strip():
-                    # 필드명 변경 적용 ('상품명' -> 'Product Name')
                     res = df_database[df_database['Product Name'].astype(str) == search_val]
-                    
-                    if res.empty:
-                        st.error("찾을 수 없습니다. 다시 입력해주세요!")
+                    if res.empty: st.error("찾을 수 없습니다. 다시 입력해주세요!")
                     else:
                         st.markdown("<div class='search-header-result'><h3>📑 검색 결과</h3></div>", unsafe_allow_html=True)
                         st.success("💡 5개 이상의 결과는 표 안에서 위아래로 스크롤하여 확인하세요. 표의 열 제목을 클릭하면 정렬됩니다.")
@@ -553,7 +573,6 @@ else:
                         if len(search_vals) > 1:
                             st.error("🚨 입력조건을 모두 만족하는 농약은 없습니다.")
                             st.markdown("#### 💡 각 병해충 조건별 적용 가능한 농약")
-                            
                             for val in search_vals:
                                 individual_res = df_database[df_database['Byung'].astype(str).str.contains(val)]
                                 if not individual_res.empty:
@@ -576,7 +595,8 @@ else:
         col_limit, _ = st.columns([7, 3])
         with col_limit:
             st.subheader("🔬 작용기작 사전")
-            if df_moa_db.empty: st.error("🚨 DB에서 작용기작 정보를 불러올 수 없습니다. (Supabase에서 Disable RLS 처리를 확인해주세요.)")
+            if df_moa_db.empty or '작용기작 코드' not in df_moa_db.columns: 
+                st.error("🚨 DB에서 작용기작 정보를 불러올 수 없습니다. 필드명이 올바른지 확인해주세요.")
             else:
                 moa_codes = sorted([str(code).strip() for code in df_moa_db['작용기작 코드'].unique() if str(code).strip() and str(code) != 'nan'])
                 search_moa = st.selectbox("궁금한 작용기작 코드 검색/선택:", options=moa_codes, index=None, placeholder="예: 가1, 1a, H01")
@@ -614,15 +634,13 @@ else:
             st.dataframe(styled_empty, hide_index=True)
         else:
             display_history = df_history.copy()
-            # UI에 보여주기 위해 필드명을 다시 한글로 매핑
             rename_hist = {
-                'Date': '방제일자', 'Time': '방제시간', 'Nongyak': '약제명',
-                'Type': '종류', 'Kijak': '작용기작', 'Spec': '규격',
-                'Qty': '수량', 'Tqty': '총살포량', 'Byung': '적용병해충', 'Remark': '메모'
+                'Date': '방제일자', 'Time': '방제시간', 'Nongyak': '약제명', 'Type': '종류', 
+                'Kijak': '작용기작', 'Spec': '규격', 'Qty': '수량', 'Tqty': '총살포량', 
+                'Byung': '적용병해충', 'Remark': '메모'
             }
             display_history = display_history.rename(columns=rename_hist)
-            if 'ID' in display_history.columns:
-                display_history = display_history.drop(columns=['ID']) # 화면에서 ID는 숨김처리
+            if 'ID' in display_history.columns: display_history = display_history.drop(columns=['ID']) 
                 
             styled_history = display_history.style.set_properties(**{'font-size': '14.5px', 'text-align': 'center', 'padding': '8px 10px', 'white-space': 'nowrap'})
             st.dataframe(styled_history, hide_index=True)
@@ -655,7 +673,6 @@ else:
             records_to_add = []
             for i in range(num_pest):
                 st.markdown(f"<p style='color:#1b5e20; font-size:20px; font-weight:900; margin-top:15px;'>🧪 약제 {i+1} 상세정보</p>", unsafe_allow_html=True)
-                
                 sel_name = st.selectbox(f"상품명 (검색/선택) - 약제 {i+1}", options=[""] + pesticide_list, key=f"p_name_{i}")
                 
                 d_type, d_moa, d_size, d_pest, d_family = "", "", "", "", ""
@@ -685,25 +702,16 @@ else:
                     if not rec['name']: st.error(f"⚠️ 약제 {idx+1}의 상품명을 선택하거나 검색해 주세요."); valid = False; break
                 
                 if valid:
-                    # 💡 수정사항: 이미지에 표기된 날짜/시간(AM/PM) 포맷 및 영문 필드 구조 반영
                     dt_str = h_date.strftime("%Y-%m-%d")
                     time_str = h_time.strftime("%I:%M %p").lstrip('0')
-                    base_id = int(datetime.now().strftime("%y%m%d%H%M%S")) # 고유 ID 부여
+                    base_id = int(datetime.now().strftime("%y%m%d%H%M%S"))
                     
                     db_insert_data = []
                     for idx, rec in enumerate(records_to_add):
                         db_insert_data.append({
-                            "ID": base_id + idx, 
-                            "Date": dt_str,
-                            "Time": time_str,
-                            "Nongyak": rec['name'],
-                            "Type": rec['type'],
-                            "Kijak": rec['moa'],
-                            "Spec": rec['size'],
-                            "Qty": rec['qty'],
-                            "Tqty": str(h_vol),
-                            "Byung": rec['pest'],
-                            "Remark": h_memo
+                            "ID": base_id + idx, "Date": dt_str, "Time": time_str, "Nongyak": rec['name'],
+                            "Type": rec['type'], "Kijak": rec['moa'], "Spec": rec['size'], "Qty": rec['qty'],
+                            "Tqty": str(h_vol), "Byung": rec['pest'], "Remark": h_memo
                         })
                     
                     try:
@@ -737,19 +745,15 @@ else:
             st.markdown("<p style='font-size: 15px; font-weight: bold; margin-bottom: 5px;'>업로드된 사진 미리보기:</p>", unsafe_allow_html=True)
             cols_img = st.columns(len(images_to_analyze))
             for idx, img_file in enumerate(images_to_analyze):
-                with cols_img[idx]:
-                    st.image(img_file, use_container_width=True)
+                with cols_img[idx]: st.image(img_file, use_container_width=True)
             
             st.markdown("<br>", unsafe_allow_html=True)
             
             if st.button("🚀 AI 판독 시작", type="primary"):
                 with st.spinner("AI가 사진의 유효성을 검사하고 판독 중입니다..."):
                     time.sleep(2) 
-                    
                     is_valid = all(img.size > 0 for img in images_to_analyze)
-                    
-                    if not is_valid:
-                        st.error("🚨 [사진판독 불가] 입력된 사진의 화질이 너무 낮거나 손상되었습니다. 다시 촬영해 주세요.")
+                    if not is_valid: st.error("🚨 [사진판독 불가] 입력된 사진의 화질이 너무 낮거나 손상되었습니다. 다시 촬영해 주세요.")
                     else:
                         st.session_state.ai_results = [
                             {"name": "검은점무늬병", "prob": 88.5, "desc": "감귤 잎과 과실에 흑갈색 반점이 생기는 병으로, 장마철 비산되는 포자에 의해 주로 감염됩니다."},
@@ -764,15 +768,8 @@ else:
             cols = st.columns(3)
             for i, res in enumerate(st.session_state.ai_results):
                 with cols[i]:
-                    st.markdown(f"""
-                        <div class='ai-result-card'>
-                            <h3>{res['name']}</h3>
-                            <p>{res['prob']}%</p>
-                        </div>
-                    """, unsafe_allow_html=True)
-                    
-                    if st.button(f"상세 정보 보기 👆", key=f"btn_ai_{i}", use_container_width=True):
-                        show_pest_popup(res['name'], res['prob'], res['desc'])
+                    st.markdown(f"<div class='ai-result-card'><h3>{res['name']}</h3><p>{res['prob']}%</p></div>", unsafe_allow_html=True)
+                    if st.button(f"상세 정보 보기 👆", key=f"btn_ai_{i}", use_container_width=True): show_pest_popup(res['name'], res['prob'], res['desc'])
             
             st.markdown("<br>", unsafe_allow_html=True)
             st.error("⚠️ **유의사항:** AI 정밀판독 결과이나 오류가 있을 수 있습니다. 최종 방제 결정 전 전문가의 진단을 참고하시기 바랍니다.")
