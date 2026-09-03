@@ -1,8 +1,9 @@
 # ==========================================
-# 📌 버전: 25.0 | 수정일시: 2026.09.03
+# 📌 버전: 26.0 | 수정일시: 2026.09.03
 # 📌 주요 수정내용: 
-#    1. 나의 방제이력 st.form 제거 및 실시간 반응형 UI로 전면 개편 (다중 약제 및 자동완성 즉시 작동)
-#    2. form_reset_key를 활용한 완벽한 입력칸 초기화(Clear) 구현
+#    1. 정보교환마당을 Supabase 'DBboard' 테이블과 완벽 연동 (실시간 읽기/쓰기 구현)
+#    2. 메뉴명 'Q&A' -> '질문하고 답하기'로 수정 및 UI 개선
+#    3. 작성일자(created_at) 자동 표시 및 답변(Reply) 유무에 따른 동적 화면 구성
 # ==========================================
 
 import streamlit as st
@@ -44,10 +45,6 @@ except Exception as e:
 # ==========================================
 # 💾 세션 초기화 및 상태 관리
 # ==========================================
-if 'notices' not in st.session_state:
-    st.session_state.notices = ["<b>[필독]</b> 장마철 검은점무늬병 주의보 발령 (누적 강수량 200mm 초과 예상)", "[안내] 신규 등록 약제(살균제) 3종 리스트 업데이트 완료"]
-if 'qnas' not in st.session_state:
-    st.session_state.qnas = [{"author": "제주농부", "content": "잎 뒷면에 이런 하얀 딱지가 생겼는데 더뎅이병일까요?", "reply": "👨‍🌾 KIMBO: 사진상으로는 볼록총채벌레 피해 흔적과 유사해 보입니다."}]
 if 'list_count' not in st.session_state: 
     st.session_state.list_count = 5
 if 'logged_in' not in st.session_state:
@@ -56,8 +53,6 @@ if 'current_user' not in st.session_state:
     st.session_state.current_user = {}
 if 'active_menu' not in st.session_state:
     st.session_state.active_menu = "내가 필요한 농약 찾기"
-
-# 💡 강제 초기화를 위한 상태 키 생성
 if 'form_reset_key' not in st.session_state:
     st.session_state.form_reset_key = 0
 
@@ -85,8 +80,8 @@ st.markdown("""
     button[kind="secondaryFormSubmit"]:active, button[kind="primary"]:active { transform: translateY(4px) !important; }
     .custom-card { border-radius: 15px; padding: 20px; margin-bottom: 15px; box-shadow: 0px 4px 10px rgba(0,0,0,0.05); }
     .card-weather { border: 3px solid #ffcc80; text-align: center; font-size: 1.15rem; font-weight: 800; line-height: 1.4; background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%); color: #3e2723; }
-    .card-notice { border: 2px solid #fdd835; height: 100%; min-height: 350px; background-color: #fffde7; color: #333; }
-    .card-qa { border: 2px solid #64b5f6; height: 100%; min-height: 350px; background-color: #e3f2fd; color: #333; }
+    .card-notice { border: 2px solid #fdd835; height: 100%; min-height: 400px; background-color: #fffde7; color: #333; }
+    .card-qa { border: 2px solid #64b5f6; height: 100%; min-height: 400px; background-color: #e3f2fd; color: #333; }
     .card-moa { border: 3px solid #66bb6a; margin-top: 20px; position: relative; overflow: hidden; background-color: #f8fbfa; }
     .moa-inner { padding: 15px 20px; border-radius: 12px; margin-bottom: 15px; box-shadow: 0px 2px 5px rgba(0,0,0,0.03); }
     .moa-inner.type { background-color: white; border-left: 5px solid #1565c0; color: #333;}
@@ -444,7 +439,6 @@ else:
     menu_idx = menus.index(st.session_state.active_menu) if st.session_state.active_menu in menus else 0
     selected_menu = st.radio("메인 메뉴", menus, index=menu_idx, horizontal=True, label_visibility="collapsed")
     
-    # 💡 메뉴 변경 시 방제이력 폼 리셋 트리거
     if selected_menu != st.session_state.active_menu:
         st.session_state.active_menu = selected_menu
         st.session_state.form_reset_key += 1
@@ -621,7 +615,6 @@ else:
             
         st.markdown("<br>", unsafe_allow_html=True)
         
-        # 💡 [핵심 수정] st.form 완전 제거, 실시간 반응형 폼으로 구축
         with st.expander("➕ 새로운 방제 기록 추가하기 (최대 6개 약제 혼용 가능)", expanded=False):
             reset_key = st.session_state.form_reset_key
             
@@ -647,7 +640,6 @@ else:
             h_memo = st.text_input("특이사항 (메모)", placeholder="예: 비 오기 전 예방살포", key=f"h_memo_{reset_key}")
             
             st.markdown("<hr style='margin: 15px 0;'>", unsafe_allow_html=True)
-            # 💡 [핵심 수정] st.form이 없으므로 선택하는 즉시 화면이 재생성되어 행(row)이 늘어남
             num_pest = st.selectbox("🔀 한 번에 섞어서 칠(혼용할) 약제는 몇 가지인가요?", [1, 2, 3, 4, 5, 6], index=0, key=f"num_pest_{reset_key}")
             
             st.markdown("<div style='border: 3px solid #ffb74d; border-radius: 15px; padding: 25px; box-shadow: 0px 6px 15px rgba(255,183,77,0.15); margin-bottom: 15px;'>", unsafe_allow_html=True)
@@ -665,8 +657,6 @@ else:
                         d_type, d_moa, d_size, d_pest, d_family = str(r.get('Type','')), str(r.get('Kijak','')), str(r.get('Spec','')), str(r.get('Byung','')), str(r.get('Gyetong',''))
                         
                 col_p1, col_p2, col_p3 = st.columns(3)
-                
-                # 💡 [핵심 수정] 농약 선택 시 새로운 키값을 부여하여 강제로 데이터 업데이트 (자동완성 100% 작동)
                 dynamic_key = f"_{sel_name}_{reset_key}"
                 
                 with col_p1: p_type = st.text_input(f"약제종류", value=d_type, key=f"p_type_{i}{dynamic_key}")
@@ -776,33 +766,120 @@ else:
             st.error("⚠️ **유의사항:** AI 정밀판독 결과이나 오류가 있을 수 있습니다. 최종 방제 결정 전 전문가의 진단을 참고하시기 바랍니다.")
 
     # ----------------------------------------
-    # 메뉴 7: 정보교환마당
+    # 💡 [핵심 수정] 메뉴 7: 정보교환마당 (DBboard 연동 완료)
     # ----------------------------------------
     elif menu == "정보교환마당":
         st.subheader("💬 정보교환마당")
+        
+        # 1. DBboard에서 데이터 실시간 로딩
+        df_board = pd.DataFrame()
+        if supabase_connected:
+            try:
+                res_board = supabase.table("DBboard").select("*").order("created_at", desc=True).execute()
+                df_board = pd.DataFrame(res_board.data)
+            except Exception as e:
+                st.error(f"게시판 데이터 로딩 중 오류가 발생했습니다: {e}")
+
         col_notice, col_qa = st.columns(2)
+        
+        # --- [공지사항 영역] ---
         with col_notice:
             n_html = "<div class='custom-card card-notice'><h4>📢 공지사항</h4><hr><ul>"
-            for n in st.session_state.notices: n_html += f"<li>{n}</li>"
+            
+            if not df_board.empty and 'Type' in df_board.columns:
+                df_notice = df_board[df_board['Type'] == '공지']
+                if not df_notice.empty:
+                    for _, row in df_notice.iterrows():
+                        content = str(row.get('Content', '')).replace('\n', '<br>')
+                        # 날짜를 깔끔하게 연-월-일로 자르기
+                        date_str = str(row.get('created_at', ''))[:10]
+                        n_html += f"<li style='margin-bottom: 12px; line-height: 1.4;'>{content} <br><span style='font-size:12px; color:gray;'>({date_str})</span></li>"
+                else:
+                    n_html += "<li>등록된 공지사항이 없습니다.</li>"
+            else:
+                n_html += "<li>등록된 공지사항이 없습니다.</li>"
+                
             n_html += "</ul></div>"
             st.markdown(n_html, unsafe_allow_html=True)
-            with st.expander("➕ 공지 등록"):
+            
+            # 관리자용 공지 등록 폼
+            with st.expander("➕ 공지 등록 (관리자용)"):
                 with st.form("notice_form", clear_on_submit=True):
-                    new_notice = st.text_area("내용 입력", height=150, placeholder="긴 공지사항 내용도 편하게 입력하실 수 있습니다.")
-                    if st.form_submit_button("등록") and new_notice: st.session_state.notices.append(new_notice); st.rerun()
+                    new_notice = st.text_area("공지 내용 입력", height=100, placeholder="새로운 공지사항을 입력하세요.")
+                    if st.form_submit_button("공지 등록", type="primary"):
+                        if new_notice:
+                            insert_data = {
+                                "ID": int(datetime.now().strftime("%y%m%d%H%M%S")),
+                                "Type": "공지",
+                                "Author": "관리자",
+                                "Content": new_notice,
+                                "UserID": st.session_state.current_user.get('id', 'admin') if st.session_state.logged_in else "admin"
+                            }
+                            try:
+                                supabase.table("DBboard").insert(insert_data).execute()
+                                st.success("✅ 공지가 등록되었습니다.")
+                                time.sleep(1)
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"🚨 공지 등록 실패: {e}")
+                        else:
+                            st.warning("내용을 입력해주세요.")
+
+        # --- [질문하고 답하기 영역] ---
         with col_qa:
-            q_html = "<div class='custom-card card-qa'><h4>❓ Q&A</h4><hr><div>"
-            for q in st.session_state.qnas:
-                q_html += f"<p>👤 <b>{q['author']}</b>: {q['content']}</p>"
-                if q['reply']: q_html += f"<p style='margin-left: 15px; color: #4CAF50;'>└ {q['reply']}</p>"
+            q_html = "<div class='custom-card card-qa'><h4>❓ 질문하고 답하기</h4><hr><div>"
+            
+            if not df_board.empty and 'Type' in df_board.columns:
+                df_qa = df_board[df_board['Type'] == '질문']
+                if not df_qa.empty:
+                    for _, row in df_qa.iterrows():
+                        author = row.get('Author', '익명')
+                        content = str(row.get('Content', '')).replace('\n', '<br>')
+                        reply = row.get('Reply', '')
+                        date_str = str(row.get('created_at', ''))[:10]
+                        
+                        q_html += f"<p style='margin-bottom: 5px; line-height: 1.4;'>👤 <b>{author}</b> <span style='font-size:11px; color:gray;'>{date_str}</span><br>{content}</p>"
+                        
+                        # 답변이 존재할 경우에만 초록색으로 덧붙여 출력
+                        if pd.notna(reply) and str(reply).strip() and str(reply) != 'None' and str(reply) != 'nan':
+                            reply_text = str(reply).replace('\n', '<br>')
+                            q_html += f"<p style='margin-left: 15px; color: #2e7d32; margin-top: 0; font-weight: bold;'>└ [답변] {reply_text}</p>"
+                            
+                        q_html += "<hr style='margin: 12px 0; border-top: 1px dashed #90caf9;'>"
+                else:
+                    q_html += "<p>등록된 질문이 없습니다.</p>"
+            else:
+                q_html += "<p>등록된 질문이 없습니다.</p>"
+                
             q_html += "</div></div>"
             st.markdown(q_html, unsafe_allow_html=True)
+            
+            # 사용자용 질문 등록 폼
             with st.expander("➕ 질문 남기기"):
                 with st.form("qa_form", clear_on_submit=True):
-                    q_author = st.text_input("작성자")
-                    q_content = st.text_area("질문 내용")
-                    if st.form_submit_button("등록") and q_author and q_content:
-                        st.session_state.qnas.append({"author": q_author, "content": q_content, "reply": ""}); st.rerun()
+                    # 로그인되어 있으면 이름을 자동으로 채워줌
+                    default_author = st.session_state.current_user.get('name', '') if st.session_state.logged_in else ""
+                    q_author = st.text_input("작성자명", value=default_author, placeholder="예: 조천읍 감귤농부")
+                    q_content = st.text_area("질문 내용", height=100, placeholder="농약이나 병해충에 대해 궁금한 점을 남겨주세요.")
+                    
+                    if st.form_submit_button("질문 등록", type="primary"):
+                        if q_author and q_content:
+                            insert_data = {
+                                "ID": int(datetime.now().strftime("%y%m%d%H%M%S")),
+                                "Type": "질문",
+                                "Author": q_author,
+                                "Content": q_content,
+                                "UserID": st.session_state.current_user.get('id', 'guest') if st.session_state.logged_in else "guest"
+                            }
+                            try:
+                                supabase.table("DBboard").insert(insert_data).execute()
+                                st.success("✅ 질문이 등록되었습니다.")
+                                time.sleep(1)
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"🚨 질문 등록 실패: {e}")
+                        else:
+                            st.warning("작성자명과 질문 내용을 모두 입력해주세요.")
 
     st.markdown("<br><br><br>---", unsafe_allow_html=True)
     st.caption("<div style='text-align: center; color: gray; font-size: 1.1em;'><b>Developed by KIMBO & Gemini</b></div>", unsafe_allow_html=True)
