@@ -1,8 +1,8 @@
 # ==========================================
-# 📌 버전: 24.3 | 수정일시: 2026.09.03
+# 📌 버전: 25.0 | 수정일시: 2026.09.03
 # 📌 주요 수정내용: 
-#    1. 나의 방제이력 입력폼 제출 성공 시 입력값 완전 초기화 (st.form clear_on_submit 활용)
-#    2. 나의 방제이력 메뉴 진입 시 상태를 새로고침하여 깨끗한 화면 유지
+#    1. 나의 방제이력 st.form 제거 및 실시간 반응형 UI로 전면 개편 (다중 약제 및 자동완성 즉시 작동)
+#    2. form_reset_key를 활용한 완벽한 입력칸 초기화(Clear) 구현
 # ==========================================
 
 import streamlit as st
@@ -20,7 +20,7 @@ from supabase import create_client, Client
 st.set_page_config(page_title="내가 찾는 농약", page_icon="🍊", layout="wide")
 
 # ==========================================
-# 🔐 Supabase 클라우드 DB 연결 설정 (스마트 자동 교정)
+# 🔐 Supabase 클라우드 DB 연결 설정
 # ==========================================
 @st.cache_resource
 def init_connection() -> Client:
@@ -57,7 +57,7 @@ if 'current_user' not in st.session_state:
 if 'active_menu' not in st.session_state:
     st.session_state.active_menu = "내가 필요한 농약 찾기"
 
-# 💡 [핵심 수정] 폼 초기화를 위한 강제 키(Key) 생성
+# 💡 강제 초기화를 위한 상태 키 생성
 if 'form_reset_key' not in st.session_state:
     st.session_state.form_reset_key = 0
 
@@ -444,7 +444,7 @@ else:
     menu_idx = menus.index(st.session_state.active_menu) if st.session_state.active_menu in menus else 0
     selected_menu = st.radio("메인 메뉴", menus, index=menu_idx, horizontal=True, label_visibility="collapsed")
     
-    # 💡 [핵심 수정] 메뉴 이동 시 폼 완전 초기화를 위한 키 업데이트
+    # 💡 메뉴 변경 시 방제이력 폼 리셋 트리거
     if selected_menu != st.session_state.active_menu:
         st.session_state.active_menu = selected_menu
         st.session_state.form_reset_key += 1
@@ -621,106 +621,109 @@ else:
             
         st.markdown("<br>", unsafe_allow_html=True)
         
+        # 💡 [핵심 수정] st.form 완전 제거, 실시간 반응형 폼으로 구축
         with st.expander("➕ 새로운 방제 기록 추가하기 (최대 6개 약제 혼용 가능)", expanded=False):
-            # 💡 [핵심 수정] 폼 초기화를 위해 st.form 도입 및 clear_on_submit=True 적용
-            with st.form(key=f"spray_history_form_{st.session_state.form_reset_key}", clear_on_submit=True):
-                col_h1, col_h2, col_h3 = st.columns(3)
-                with col_h1: 
-                    h_date = st.date_input("📅 방제일자", value=date.today())
-                with col_h2: 
-                    time_options = [f"{h:02d}:{m:02d}" for h in range(24) for m in range(0, 60, 10)]
-                    default_time_idx = time_options.index("05:00")
-                    h_time_str = st.selectbox("⏰ 방제시작 (시간 선택)", options=time_options, index=default_time_idx)
-                with col_h3:
-                    st.markdown("<p style='font-size: 18px; font-weight: 800; margin-bottom: 5px;'>💧 총 살포량</p>", unsafe_allow_html=True)
-                    col_v1, col_v2 = st.columns([2, 1], gap="small")
-                    with col_v1: h_vol = st.text_input("살포량", placeholder="예: 1000", label_visibility="collapsed")
-                    with col_v2: h_unit = st.selectbox("단위", ["L", "말"], label_visibility="collapsed")
-                    
-                col_h4, col_h5 = st.columns([1, 2])
-                with col_h4: h_crop = st.selectbox("작물명", ["노지 감귤", "하우스 감귤", "비가림 감귤", "기타 과수"])
-                with col_h5: 
-                    h_pest_list = st.multiselect("🐛 전체 방제 대상 병해충 (검색/선택)", options=pest_list, placeholder="병해충명을 검색하세요")
-                    h_pest_combined = ", ".join(h_pest_list)
-                    
-                h_memo = st.text_input("특이사항 (메모)", placeholder="예: 비 오기 전 예방살포")
+            reset_key = st.session_state.form_reset_key
+            
+            col_h1, col_h2, col_h3 = st.columns(3)
+            with col_h1: 
+                h_date = st.date_input("📅 방제일자", value=date.today(), key=f"h_date_{reset_key}")
+            with col_h2: 
+                time_options = [f"{h:02d}:{m:02d}" for h in range(24) for m in range(0, 60, 10)]
+                default_time_idx = time_options.index("05:00")
+                h_time_str = st.selectbox("⏰ 방제시작 (시간 선택)", options=time_options, index=default_time_idx, key=f"h_time_{reset_key}")
+            with col_h3:
+                st.markdown("<p style='font-size: 18px; font-weight: 800; margin-bottom: 5px;'>💧 총 살포량</p>", unsafe_allow_html=True)
+                col_v1, col_v2 = st.columns([2, 1], gap="small")
+                with col_v1: h_vol = st.text_input("살포량", placeholder="예: 1000", label_visibility="collapsed", key=f"h_vol_{reset_key}")
+                with col_v2: h_unit = st.selectbox("단위", ["L", "말"], label_visibility="collapsed", key=f"h_unit_{reset_key}")
                 
-                st.markdown("<hr style='margin: 15px 0;'>", unsafe_allow_html=True)
-                num_pest = st.selectbox("🔀 한 번에 섞어서 칠(혼용할) 약제는 몇 가지인가요?", [1, 2, 3, 4, 5, 6], index=0)
+            col_h4, col_h5 = st.columns([1, 2])
+            with col_h4: h_crop = st.selectbox("작물명", ["노지 감귤", "하우스 감귤", "비가림 감귤", "기타 과수"], key=f"h_crop_{reset_key}")
+            with col_h5: 
+                h_pest_list = st.multiselect("🐛 전체 방제 대상 병해충 (검색/선택)", options=pest_list, placeholder="병해충명을 검색하세요", key=f"h_pest_list_{reset_key}")
+                h_pest_combined = ", ".join(h_pest_list)
                 
-                st.markdown("<div style='border: 3px solid #ffb74d; border-radius: 15px; padding: 25px; box-shadow: 0px 6px 15px rgba(255,183,77,0.15); margin-bottom: 15px;'>", unsafe_allow_html=True)
+            h_memo = st.text_input("특이사항 (메모)", placeholder="예: 비 오기 전 예방살포", key=f"h_memo_{reset_key}")
+            
+            st.markdown("<hr style='margin: 15px 0;'>", unsafe_allow_html=True)
+            # 💡 [핵심 수정] st.form이 없으므로 선택하는 즉시 화면이 재생성되어 행(row)이 늘어남
+            num_pest = st.selectbox("🔀 한 번에 섞어서 칠(혼용할) 약제는 몇 가지인가요?", [1, 2, 3, 4, 5, 6], index=0, key=f"num_pest_{reset_key}")
+            
+            st.markdown("<div style='border: 3px solid #ffb74d; border-radius: 15px; padding: 25px; box-shadow: 0px 6px 15px rgba(255,183,77,0.15); margin-bottom: 15px;'>", unsafe_allow_html=True)
+            
+            records_to_add = []
+            for i in range(num_pest):
+                st.markdown(f"<p style='color:#1b5e20; font-size:20px; font-weight:900; margin-top:15px;'>🧪 약제 {i+1} 상세정보</p>", unsafe_allow_html=True)
+                sel_name = st.selectbox(f"상품명 (검색/선택) - 약제 {i+1}", options=[""] + pesticide_list, key=f"p_name_{i}_{reset_key}")
                 
-                records_to_add = []
-                for i in range(num_pest):
-                    st.markdown(f"<p style='color:#1b5e20; font-size:20px; font-weight:900; margin-top:15px;'>🧪 약제 {i+1} 상세정보</p>", unsafe_allow_html=True)
-                    sel_name = st.selectbox(f"상품명 (검색/선택) - 약제 {i+1}", options=[""] + pesticide_list, key=f"p_name_{i}")
-                    
-                    d_type, d_moa, d_size, d_pest, d_family = "", "", "", "", ""
-                    if sel_name:
-                        db_row = df_database[df_database['Product Name'] == sel_name]
-                        if not db_row.empty:
-                            r = db_row.iloc[0]
-                            d_type, d_moa, d_size, d_pest, d_family = str(r.get('Type','')), str(r.get('Kijak','')), str(r.get('Spec','')), str(r.get('Byung','')), str(r.get('Gyetong',''))
-                            
-                    col_p1, col_p2, col_p3 = st.columns(3)
-                    
-                    dynamic_suffix = f"_{sel_name}" if sel_name else ""
-                    
-                    with col_p1: p_type = st.text_input(f"약제종류", value=d_type, key=f"p_type_{i}{dynamic_suffix}")
-                    with col_p2: p_moa = st.text_input(f"작용기작", value=d_moa, key=f"p_moa_{i}{dynamic_suffix}")
-                    with col_p3: p_size = st.text_input(f"규격", value=d_size, key=f"p_size_{i}{dynamic_suffix}")
-                    
-                    col_p4, col_p5, col_p6, col_p7 = st.columns(4)
-                    with col_p4: p_qty = st.text_input(f"수량", value="1", key=f"p_qty_{i}") 
-                    with col_p5: p_pest = st.text_input(f"적용병해충", value=d_pest, key=f"p_pest_{i}{dynamic_suffix}")
-                    with col_p6: p_family = st.text_input(f"계통", value=d_family, key=f"p_family_{i}{dynamic_suffix}")
-                    with col_p7: pass 
-                    
-                    st.markdown("<hr style='margin: 10px 0; border-style: dashed; border-color: #a5d6a7;'>", unsafe_allow_html=True)
-                    records_to_add.append({"name": sel_name, "type": p_type, "moa": p_moa, "size": p_size, "qty": p_qty, "pest": p_pest, "family": p_family})
-                    
-                submit_button = st.form_submit_button("💾 입력한 방제 기록 DB에 일괄 저장하기", type="primary")
+                d_type, d_moa, d_size, d_pest, d_family = "", "", "", "", ""
+                if sel_name:
+                    db_row = df_database[df_database['Product Name'] == sel_name]
+                    if not db_row.empty:
+                        r = db_row.iloc[0]
+                        d_type, d_moa, d_size, d_pest, d_family = str(r.get('Type','')), str(r.get('Kijak','')), str(r.get('Spec','')), str(r.get('Byung','')), str(r.get('Gyetong',''))
+                        
+                col_p1, col_p2, col_p3 = st.columns(3)
                 
-                if submit_button:
-                    valid = True
+                # 💡 [핵심 수정] 농약 선택 시 새로운 키값을 부여하여 강제로 데이터 업데이트 (자동완성 100% 작동)
+                dynamic_key = f"_{sel_name}_{reset_key}"
+                
+                with col_p1: p_type = st.text_input(f"약제종류", value=d_type, key=f"p_type_{i}{dynamic_key}")
+                with col_p2: p_moa = st.text_input(f"작용기작", value=d_moa, key=f"p_moa_{i}{dynamic_key}")
+                with col_p3: p_size = st.text_input(f"규격", value=d_size, key=f"p_size_{i}{dynamic_key}")
+                
+                col_p4, col_p5, col_p6, col_p7 = st.columns(4)
+                with col_p4: p_qty = st.text_input(f"수량", value="1", key=f"p_qty_{i}_{reset_key}") 
+                with col_p5: p_pest = st.text_input(f"적용병해충", value=d_pest, key=f"p_pest_{i}{dynamic_key}")
+                with col_p6: p_family = st.text_input(f"계통", value=d_family, key=f"p_family_{i}{dynamic_key}")
+                with col_p7: pass 
+                
+                st.markdown("<hr style='margin: 10px 0; border-style: dashed; border-color: #a5d6a7;'>", unsafe_allow_html=True)
+                records_to_add.append({"name": sel_name, "type": p_type, "moa": p_moa, "size": p_size, "qty": p_qty, "pest": p_pest, "family": p_family})
+                
+            submit_button = st.button("💾 입력한 방제 기록 DB에 일괄 저장하기", type="primary")
+            
+            if submit_button:
+                valid = True
+                for idx, rec in enumerate(records_to_add):
+                    if not rec['name']: st.error(f"⚠️ 약제 {idx+1}의 상품명을 선택하거나 검색해 주세요."); valid = False; break
+                
+                if valid:
+                    dt_str = h_date.strftime("%Y-%m-%d")
+                    time_obj = datetime.strptime(h_time_str, "%H:%M")
+                    formatted_time_str = time_obj.strftime("%I:%M %p").lstrip('0')
+                    
+                    base_id = int(datetime.now().strftime("%y%m%d%H%M%S"))
+                    
+                    try:
+                        tqty_val = int(str(h_vol).replace(',', '').strip()) if str(h_vol).strip() else None
+                    except:
+                        tqty_val = None
+                        
+                    db_insert_data = []
                     for idx, rec in enumerate(records_to_add):
-                        if not rec['name']: st.error(f"⚠️ 약제 {idx+1}의 상품명을 선택하거나 검색해 주세요."); valid = False; break
-                    
-                    if valid:
-                        dt_str = h_date.strftime("%Y-%m-%d")
-                        time_obj = datetime.strptime(h_time_str, "%H:%M")
-                        formatted_time_str = time_obj.strftime("%I:%M %p").lstrip('0')
-                        
-                        base_id = int(datetime.now().strftime("%y%m%d%H%M%S"))
-                        
                         try:
-                            tqty_val = int(str(h_vol).replace(',', '').strip()) if str(h_vol).strip() else None
+                            qty_val = int(str(rec['qty']).replace(',', '').strip()) if str(rec['qty']).strip() else None
                         except:
-                            tqty_val = None
+                            qty_val = None
                             
-                        db_insert_data = []
-                        for idx, rec in enumerate(records_to_add):
-                            try:
-                                qty_val = int(str(rec['qty']).replace(',', '').strip()) if str(rec['qty']).strip() else None
-                            except:
-                                qty_val = None
-                                
-                            db_insert_data.append({
-                                "ID": base_id + idx, "Date": dt_str, "Time": formatted_time_str, "Nongyak": rec['name'],
-                                "Type": rec['type'], "Kijak": rec['moa'], "Spec": rec['size'], "Qty": qty_val,
-                                "Tqty": tqty_val, "Byung": rec['pest'], "Remark": h_memo
-                            })
-                        
-                        try:
-                            supabase.table("DBbangje").insert(db_insert_data).execute()
-                            st.success("✅ 혼용 방제 기록이 안전하게 클라우드 DB에 저장되었습니다!")
-                            st.session_state.form_reset_key += 1 # 폼 강제 초기화 트리거
-                            time.sleep(1.5)
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"🚨 저장 중 오류가 발생했습니다: {e}")
-                        
-                st.markdown("</div>", unsafe_allow_html=True)
+                        db_insert_data.append({
+                            "ID": base_id + idx, "Date": dt_str, "Time": formatted_time_str, "Nongyak": rec['name'],
+                            "Type": rec['type'], "Kijak": rec['moa'], "Spec": rec['size'], "Qty": qty_val,
+                            "Tqty": tqty_val, "Byung": rec['pest'], "Remark": h_memo
+                        })
+                    
+                    try:
+                        supabase.table("DBbangje").insert(db_insert_data).execute()
+                        st.success("✅ 혼용 방제 기록이 안전하게 클라우드 DB에 저장되었습니다!")
+                        st.session_state.form_reset_key += 1
+                        time.sleep(1.5)
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"🚨 저장 중 오류가 발생했습니다: {e}")
+                    
+            st.markdown("</div>", unsafe_allow_html=True)
 
     # ----------------------------------------
     # 메뉴 6: 병해충 분석
