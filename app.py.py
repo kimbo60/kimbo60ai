@@ -1,8 +1,8 @@
 # ==========================================
-# 📌 버전: 24.0 | 수정일시: 2026.09.03
+# 📌 버전: 24.1 | 수정일시: 2026.09.03
 # 📌 주요 수정내용: 
-#    1. 데이터 공백(띄어쓰기) 자동 제거 로직 추가로 '자동완성(Auto-populate)' 기능 정상화
-#    2. DBbangje 저장 시 Qty, Tqty 숫자형 변환 및 예외 처리 추가 (bigint 에러 해결)
+#    1. 농약명 선택 시 하위 정보 자동 입력(Auto-populate) 강제 갱신 로직 적용 (Dynamic Key 사용)
+#    2. 방제 시작 시간 입력을 타이핑(time_input)에서 팝업 선택(selectbox) 방식으로 교체
 # ==========================================
 
 import streamlit as st
@@ -20,7 +20,7 @@ from supabase import create_client, Client
 st.set_page_config(page_title="내가 찾는 농약", page_icon="🍊", layout="wide")
 
 # ==========================================
-# 🔐 Supabase 클라우드 DB 연결 설정 (스마트 자동 교정)
+# 🔐 Supabase 클라우드 DB 연결 설정
 # ==========================================
 @st.cache_resource
 def init_connection() -> Client:
@@ -105,7 +105,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 📊 Supabase 기반 데이터 로딩 및 자동 교정 함수
+# 📊 Supabase 기반 데이터 로딩
 # ==========================================
 @st.cache_data
 def get_image_base64(path):
@@ -137,29 +137,23 @@ def load_data_from_supabase():
                 elif clean_c == 'price': cols_map[c] = 'Price'
                 elif clean_c == 'byung': cols_map[c] = 'Byung'
                 elif clean_c == 'gyetong': cols_map[c] = 'Gyetong'
-            
             df_nongyak = df_nongyak.rename(columns=cols_map).fillna('')
             
-            # 💡 [핵심 수정] 엑셀에서 넘어온 보이지 않는 공백을 모든 열에서 강제 제거
             for col in df_nongyak.columns:
                 if df_nongyak[col].dtype == object:
                     df_nongyak[col] = df_nongyak[col].astype(str).str.strip()
             
             if "Product Name" in df_nongyak.columns:
                 pesticide_list = sorted([str(n) for n in df_nongyak["Product Name"].unique() if str(n) and str(n) != 'nan'])
-            else:
-                error_msgs.append(f"DBnongyak 'Product Name' 필드 인식 실패 (현재: {list(df_nongyak.columns)})")
                 
             if "Type" in df_nongyak.columns and "Byung" in df_nongyak.columns:
                 pest_raw = df_nongyak[df_nongyak['Type'].isin(['살균제', '살충제'])]["Byung"].astype(str).tolist()
                 pest_set = {re.sub(r'\(.*?\)', '', p).replace('(', '').replace(')', '').strip() for pests in pest_raw for p in pests.split(',')}
                 pest_list = sorted([p for p in pest_set if p and str(p) != 'nan'])
-            else:
-                error_msgs.append("DBnongyak 'Type' 또는 'Byung' 필드 인식 실패")
         else:
-            error_msgs.append("DBnongyak 테이블에 데이터가 비어있습니다.")
+            error_msgs.append("DBnongyak 데이터가 비어있습니다.")
     except Exception as e:
-        error_msgs.append(f"DBnongyak 로딩 에러: {e}")
+        error_msgs.append(f"DBnongyak 오류: {e}")
 
     try:
         res_k = supabase.table("DBkijak").select("*").execute()
@@ -179,9 +173,9 @@ def load_data_from_supabase():
                 if df_moa[col].dtype == object:
                     df_moa[col] = df_moa[col].astype(str).str.strip()
         else:
-            error_msgs.append("DBkijak 테이블에 데이터가 비어있습니다.")
+            error_msgs.append("DBkijak 데이터가 비어있습니다.")
     except Exception as e:
-        error_msgs.append(f"DBkijak 로딩 에러: {e}")
+        error_msgs.append(f"DBkijak 오류: {e}")
 
     error_str = " | ".join(error_msgs) if error_msgs else ""
     return df_nongyak, df_moa, pesticide_list, pest_list, error_str
@@ -243,7 +237,7 @@ def render_moa_popup_trigger(df_current_result):
         
         if selected_moa != "선택 안 함":
             if df_moa_db.empty or '작용기작 코드' not in df_moa_db.columns:
-                st.error("🚨 작용기작 DB 정보를 찾을 수 없습니다. 필드명이 올바른지 확인해주세요.")
+                st.error("🚨 작용기작 DB 정보를 찾을 수 없습니다.")
                 return
                 
             moa_list = [m.strip() for m in str(selected_moa).replace(',', '+').replace('/', '+').split('+') if m.strip()]
@@ -609,8 +603,13 @@ else:
         
         with st.expander("➕ 새로운 방제 기록 추가하기 (최대 6개 약제 혼용 가능)", expanded=False):
             col_h1, col_h2, col_h3 = st.columns(3)
-            with col_h1: h_date = st.date_input("📅 방제일자", value=date.today())
-            with col_h2: h_time = st.time_input("⏰ 방제시작", value=pd.to_datetime("05:00").time())
+            with col_h1: 
+                h_date = st.date_input("📅 방제일자", value=date.today())
+            with col_h2: 
+                # 💡 [핵심 수정] 타이핑이 아닌 10분 단위 팝업(드롭다운) 선택 방식으로 완벽 변경
+                time_options = [f"{h:02d}:{m:02d}" for h in range(24) for m in range(0, 60, 10)]
+                default_time_idx = time_options.index("05:00")
+                h_time_str = st.selectbox("⏰ 방제시작 (시간 선택)", options=time_options, index=default_time_idx)
             with col_h3:
                 st.markdown("<p style='font-size: 18px; font-weight: 800; margin-bottom: 5px;'>💧 총 살포량</p>", unsafe_allow_html=True)
                 col_v1, col_v2 = st.columns([2, 1], gap="small")
@@ -643,14 +642,18 @@ else:
                         d_type, d_moa, d_size, d_pest, d_family = str(r.get('Type','')), str(r.get('Kijak','')), str(r.get('Spec','')), str(r.get('Byung','')), str(r.get('Gyetong',''))
                         
                 col_p1, col_p2, col_p3 = st.columns(3)
-                with col_p1: p_type = st.text_input(f"약제종류", value=d_type, key=f"p_type_{i}")
-                with col_p2: p_moa = st.text_input(f"작용기작", value=d_moa, key=f"p_moa_{i}")
-                with col_p3: p_size = st.text_input(f"규격", value=d_size, key=f"p_size_{i}")
+                
+                # 💡 [핵심 수정] sel_name을 Key에 포함하여, 농약명이 바뀔 때마다 기존 빈칸의 '고집'을 꺾고 즉시 채워지도록 강제 갱신
+                dynamic_suffix = f"_{sel_name}" if sel_name else ""
+                
+                with col_p1: p_type = st.text_input(f"약제종류", value=d_type, key=f"p_type_{i}{dynamic_suffix}")
+                with col_p2: p_moa = st.text_input(f"작용기작", value=d_moa, key=f"p_moa_{i}{dynamic_suffix}")
+                with col_p3: p_size = st.text_input(f"규격", value=d_size, key=f"p_size_{i}{dynamic_suffix}")
                 
                 col_p4, col_p5, col_p6, col_p7 = st.columns(4)
-                with col_p4: p_qty = st.text_input(f"수량", value="1", key=f"p_qty_{i}")
-                with col_p5: p_pest = st.text_input(f"적용병해충", value=d_pest, key=f"p_pest_{i}")
-                with col_p6: p_family = st.text_input(f"계통", value=d_family, key=f"p_family_{i}")
+                with col_p4: p_qty = st.text_input(f"수량", value="1", key=f"p_qty_{i}") # 수량은 사용자가 직접 바꾸기 편하도록 유지
+                with col_p5: p_pest = st.text_input(f"적용병해충", value=d_pest, key=f"p_pest_{i}{dynamic_suffix}")
+                with col_p6: p_family = st.text_input(f"계통", value=d_family, key=f"p_family_{i}{dynamic_suffix}")
                 with col_p7: pass 
                 
                 st.markdown("<hr style='margin: 10px 0; border-style: dashed; border-color: #a5d6a7;'>", unsafe_allow_html=True)
@@ -663,24 +666,27 @@ else:
                 
                 if valid:
                     dt_str = h_date.strftime("%Y-%m-%d")
-                    time_str = h_time.strftime("%I:%M %p").lstrip('0')
+                    # 팝업에서 선택한 시간(예: 05:00)을 5:00 AM 같은 포맷으로 변환
+                    time_obj = datetime.strptime(h_time_str, "%H:%M")
+                    formatted_time_str = time_obj.strftime("%I:%M %p").lstrip('0')
+                    
                     base_id = int(datetime.now().strftime("%y%m%d%H%M%S"))
                     
-                    # 💡 [핵심 수정] 수량(Qty)과 총살포량(Tqty)이 비어있거나 문자일 경우 예외처리(Null 처리)
+                    # 💡 [핵심 수정] 빈칸으로 제출했을 때 숫자 에러(bigint)가 나지 않도록 None(빈 값)으로 완벽 처리
                     try:
-                        tqty_val = int(str(h_vol).replace(',', '')) if str(h_vol).strip() else None
+                        tqty_val = int(str(h_vol).replace(',', '').strip()) if str(h_vol).strip() else None
                     except:
                         tqty_val = None
                         
                     db_insert_data = []
                     for idx, rec in enumerate(records_to_add):
                         try:
-                            qty_val = int(str(rec['qty']).replace(',', '')) if str(rec['qty']).strip() else None
+                            qty_val = int(str(rec['qty']).replace(',', '').strip()) if str(rec['qty']).strip() else None
                         except:
                             qty_val = None
                             
                         db_insert_data.append({
-                            "ID": base_id + idx, "Date": dt_str, "Time": time_str, "Nongyak": rec['name'],
+                            "ID": base_id + idx, "Date": dt_str, "Time": formatted_time_str, "Nongyak": rec['name'],
                             "Type": rec['type'], "Kijak": rec['moa'], "Spec": rec['size'], "Qty": qty_val,
                             "Tqty": tqty_val, "Byung": rec['pest'], "Remark": h_memo
                         })
