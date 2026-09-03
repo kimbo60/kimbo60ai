@@ -1,8 +1,8 @@
 # ==========================================
-# 📌 버전: 30.0 | 수정일시: 2026.09.03
+# 📌 버전: 31.0 | 수정일시: 2026.09.03
 # 📌 주요 수정내용: 
-#    1. list_models() 통신 에러 제거: 모델 목록을 묻지 않고, 순차적(Fallback)으로 직접 호출하여 404 에러 원천 차단
-#    2. 병해충 분석: 다중 이미지 정렬 및 다중 이미지 동시 분석 기능 최적화
+#    1. Gemini AI 모델 세대교체 반영: 은퇴한 1.5 버전을 제외하고 최신 2.5, 2.0 모델(gemini-2.5-flash 등)로 전면 교체
+#    2. 병해충 분석: 다중 이미지 정렬 및 다중 이미지 동시 분석 기능 유지
 # ==========================================
 
 import streamlit as st
@@ -46,7 +46,7 @@ except Exception as e:
     supabase_connected = False
     st.error("🚨 Supabase 연결 설정이 완료되지 않았거나 키가 잘못되었습니다.")
 
-# 💡 [핵심 수정] 리스트를 조회하지 않고 키값만 바로 등록 (통신 에러 원천 차단)
+# Gemini API 키 설정
 gemini_ready = False
 try:
     if "GEMINI_API_KEY" in st.secrets:
@@ -239,18 +239,6 @@ def render_moa_popup_trigger(df_current_result):
                     icon = "🛡️" if "살균" in ntype else ("🐛" if "살충" in ntype else ("🌿" if "제초" in ntype else "🧪"))
                     st.markdown(f"<div class='moa-result-card'><h4>{code} <span style='font-size: 14px; font-weight: normal; opacity: 0.8;'>({icon} {ntype})</span></h4><p class='title'>{res.get('주 작용기작', '')}</p><p class='desc'>👉 {res.get('세부 작용기작', '')}</p></div>", unsafe_allow_html=True)
                 else: st.warning(f"'{code}' 정보가 DB에 없습니다.")
-
-@st.dialog("🦠 병해충 상세 정보")
-def show_pest_popup(pest_name, prob, desc):
-    st.markdown(f"""
-        <h2 style='color: #e65100; margin-top: 0;'>{pest_name}</h2>
-        <h4 style='color: #4CAF50;'>AI 일치율: {prob}%</h4>
-        <hr style='margin: 10px 0;'>
-    """, unsafe_allow_html=True)
-    st.info(f"📸 여기에 '{pest_name}'의 대표 사진이 표시됩니다.")
-    st.markdown(f"<p style='font-size: 16px; line-height: 1.6;'>{desc}</p>", unsafe_allow_html=True)
-    if st.button("❌ 닫기", use_container_width=True): 
-        st.rerun()
 
 @st.cache_data(ttl=3600)
 def fetch_kma_weather_7days():
@@ -626,7 +614,7 @@ else:
             st.markdown("</div>", unsafe_allow_html=True)
 
     # ----------------------------------------
-    # 💡 [핵심 수정] 메뉴 6: 병해충 분석 (지능형 Fallback 탐색 탑재로 404 에러 원천 해결)
+    # 💡 [핵심 수정] 메뉴 6: 병해충 분석 (최신 2.5 버전 AI 모델 전면 도입)
     # ----------------------------------------
     elif menu == "병해충 분석":
         st.subheader("📸 AI 병해충 사진 정밀 판독 (Gemini AI)")
@@ -679,12 +667,12 @@ else:
                         
                         prompt_parts = [prompt] + pil_images
                         
-                        # 구글 서버 상태에 상관없이 가장 똑똑한 모델부터 하나씩 순서대로 찔러보는 지능형(Fallback) 배열
+                        # 💡 [핵심 교체] 은퇴한 1.5 버전을 제외하고 가장 새롭고 강력한 2.5 / 2.0 모델로 업데이트!
                         models_to_try = [
-                            'gemini-1.5-flash',
-                            'gemini-1.5-pro',
-                            'gemini-1.0-pro-vision-latest',
-                            'gemini-pro-vision'
+                            'gemini-2.5-flash',
+                            'gemini-2.0-flash',
+                            'gemini-2.5-pro',
+                            'gemini-1.5-flash' # 혹시 모를 대비책
                         ]
                         
                         success = False
@@ -701,11 +689,11 @@ else:
                                 st.error("⚠️ **[면책 조항]** 위 결과는 AI의 이미지 분석 결과이며, 빛의 각도나 화질에 따라 오류가 있을 수 있습니다. 실제 농약 살포 전 반드시 전문가의 확진을 받으시길 권장합니다.")
                                 
                                 success = True
-                                break # 성공하면 다음 모델을 찾지 않고 즉시 종료!
+                                break 
                                 
                             except Exception as e:
                                 error_messages.append(f"{model_name} 연결 실패: {e}")
-                                continue # 에러가 나면 다음 모델로 넘어가서 다시 시도
+                                continue 
                                 
                         if not success:
                             st.error("🚨 구글 서버의 모든 인공지능 모델이 응답을 거부했습니다. API 키 권한이나 네트워크 상태를 확인해주세요.")
