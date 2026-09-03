@@ -1,9 +1,8 @@
 # ==========================================
-# 📌 버전: 28.0 | 수정일시: 2026.09.03
+# 📌 버전: 29.0 | 수정일시: 2026.09.03
 # 📌 주요 수정내용: 
-#    1. 병해충 분석: 다중 이미지 업로드(accept_multiple_files=True) 복구
-#    2. 병해충 분석: 업로드된 이미지를 가로 한 줄(가변 컬럼)에 작게 정렬하여 표시
-#    3. Gemini API 404 에러 해결: 모델명을 'gemini-1.5-flash-latest'로 변경 및 다중 이미지 전송 로직 적용
+#    1. Gemini 404 에러 완벽 해결: genai.list_models()를 활용한 '사용 가능한 모델 자동 탐색 및 선택' 로직 적용
+#    2. 병해충 분석: 다중 이미지 업로드 및 가로 정렬 UI 유지
 # ==========================================
 
 import streamlit as st
@@ -48,16 +47,32 @@ except Exception as e:
     supabase_connected = False
     st.error("🚨 Supabase 연결 설정이 완료되지 않았거나 키가 잘못되었습니다.")
 
-# 💡 [핵심 수정] Gemini 404 에러 해결을 위해 -latest 명칭 사용
+# 💡 [핵심 수정] Gemini API 키 설정 및 사용 가능한 모델 '자동 탐색' 로직
 gemini_ready = False
+vision_model = None
+
 try:
     gemini_api_key = str(st.secrets["GEMINI_API_KEY"]).strip().strip("\"'")
     genai.configure(api_key=gemini_api_key)
-    # 최신 버전을 확실하게 가리키도록 -latest 접미사 추가
-    vision_model = genai.GenerativeModel('gemini-1.5-flash-latest')
-    gemini_ready = True
+    
+    # 구글 서버에 현재 API 키로 사용 가능한 모든 모델 목록을 요청
+    available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+    
+    # 가장 성능이 좋은 최신 모델부터 순차적으로 탐색하여 자동 선택
+    target_model = None
+    for model_name in ['models/gemini-1.5-flash', 'models/gemini-1.5-pro', 'models/gemini-1.0-pro-vision-latest', 'models/gemini-pro-vision']:
+        if model_name in available_models:
+            target_model = model_name.replace('models/', '')
+            break
+            
+    if target_model:
+        vision_model = genai.GenerativeModel(target_model)
+        gemini_ready = True
+        st.session_state.current_ai_model = target_model # 확인용
+    else:
+        st.error("🚨 현재 API 키로 사용할 수 있는 이미지 판독 모델이 없습니다.")
 except Exception as e:
-    st.warning("⚠️ Gemini API 키(GEMINI_API_KEY)가 secrets에 등록되지 않아 AI 판독 기능이 제한됩니다.")
+    st.warning(f"⚠️ Gemini API 설정 오류: {e}")
 
 # ==========================================
 # 💾 세션 초기화 및 상태 관리
@@ -241,18 +256,6 @@ def render_moa_popup_trigger(df_current_result):
                     icon = "🛡️" if "살균" in ntype else ("🐛" if "살충" in ntype else ("🌿" if "제초" in ntype else "🧪"))
                     st.markdown(f"<div class='moa-result-card'><h4>{code} <span style='font-size: 14px; font-weight: normal; opacity: 0.8;'>({icon} {ntype})</span></h4><p class='title'>{res.get('주 작용기작', '')}</p><p class='desc'>👉 {res.get('세부 작용기작', '')}</p></div>", unsafe_allow_html=True)
                 else: st.warning(f"'{code}' 정보가 DB에 없습니다.")
-
-@st.dialog("🦠 병해충 상세 정보")
-def show_pest_popup(pest_name, prob, desc):
-    st.markdown(f"""
-        <h2 style='color: #e65100; margin-top: 0;'>{pest_name}</h2>
-        <h4 style='color: #4CAF50;'>AI 일치율: {prob}%</h4>
-        <hr style='margin: 10px 0;'>
-    """, unsafe_allow_html=True)
-    st.info(f"📸 여기에 '{pest_name}'의 대표 사진이 표시됩니다.")
-    st.markdown(f"<p style='font-size: 16px; line-height: 1.6;'>{desc}</p>", unsafe_allow_html=True)
-    if st.button("❌ 닫기", use_container_width=True): 
-        st.rerun()
 
 @st.cache_data(ttl=3600)
 def fetch_kma_weather_7days():
@@ -578,7 +581,7 @@ else:
                 dynamic_key = f"_{sel_name}_{reset_key}"
                 
                 with col_p1: p_type = st.text_input(f"약제종류", value=d_type, key=f"p_type_{i}{dynamic_key}")
-                with col_p2: p_moa = st.text_input(f"작용기작", value=d_moa, key=f"p_moa_{i}{dynamic_key}")
+                with col_p2: p_moa = text_input(f"작용기작", value=d_moa, key=f"p_moa_{i}{dynamic_key}")
                 with col_p3: p_size = st.text_input(f"규격", value=d_size, key=f"p_size_{i}{dynamic_key}")
                 
                 col_p4, col_p5, col_p6, col_p7 = st.columns(4)
@@ -628,13 +631,16 @@ else:
             st.markdown("</div>", unsafe_allow_html=True)
 
     # ----------------------------------------
-    # 💡 [핵심 수정] 메뉴 6: 병해충 분석 (다중 이미지 및 모델 버전 에러 완벽 해결)
+    # 💡 [핵심 수정] 메뉴 6: 병해충 분석 (지능형 모델 탐색 및 다중 이미지 뷰어 적용)
     # ----------------------------------------
     elif menu == "병해충 분석":
-        st.subheader("📸 AI 병해충 사진 정밀 판독 (Gemini 1.5 Flash)")
+        st.subheader("📸 AI 병해충 사진 정밀 판독 (Gemini AI)")
         st.markdown("과수원에서 발견한 병해충 의심 사진을 최대 5장까지 업로드해 주세요.")
         
-        # 1. 다중 업로드 복구 (accept_multiple_files=True)
+        if not gemini_ready:
+            st.error("🚨 Gemini API 키 설정에 문제가 있어 AI 판독 기능을 사용할 수 없습니다. 인터넷 연결과 Secrets 설정을 확인해주세요.")
+            
+        # 다중 업로드 (accept_multiple_files=True)
         uploaded_files = st.file_uploader("이미지 업로드 (최대 5장)", type=["png", "jpg", "jpeg"], accept_multiple_files=True)
         
         if uploaded_files:
@@ -644,27 +650,27 @@ else:
             
             st.success(f"✅ 총 {len(uploaded_files)}장의 사진이 입력되었습니다.")
             
-            # 2. 사진 크기 축소 및 가로 한 줄(컬럼) 정렬 표시
+            # 가로 5등분하여 사진을 썸네일 크기로 깔끔하게 한 줄 출력
             st.markdown("<p style='font-size: 15px; font-weight: bold; margin-bottom: 5px;'>업로드된 사진 미리보기:</p>", unsafe_allow_html=True)
-            cols_img = st.columns(len(uploaded_files))
+            cols_img = st.columns(5) # 무조건 5칸을 만들어 크기를 통일시킴
             pil_images = []
             
             for idx, img_file in enumerate(uploaded_files):
                 image = Image.open(img_file)
+                # 너무 큰 이미지는 크기를 줄여서 메모리 과부하 방지 (최대 800픽셀)
+                image.thumbnail((800, 800))
                 pil_images.append(image)
                 with cols_img[idx]:
                     st.image(image, use_container_width=True)
             
             st.markdown("<br>", unsafe_allow_html=True)
             
-            # 3. 판독 시작 버튼
             if st.button("🚀 Gemini AI 정밀 판독 시작", type="primary"):
-                if not gemini_ready:
-                    st.error("🚨 Gemini API 키가 설정되지 않았습니다. 앱 설정(Secrets)에 GEMINI_API_KEY를 등록해주세요.")
+                if not vision_model:
+                    st.error("🚨 구글 서버에서 AI 모델을 찾지 못했습니다. 잠시 후 다시 시도해주세요.")
                 else:
-                    with st.spinner("구글 Gemini 인공지능이 사진을 분석하고 있습니다... (약 5~15초 소요)"):
+                    with st.spinner(f"인공지능({st.session_state.get('current_ai_model', 'Gemini')})이 사진을 분석하고 있습니다... (약 5~15초 소요)"):
                         try:
-                            # AI에게 내릴 구체적인 명령
                             prompt = """
                             당신은 대한민국 제주도 환경의 감귤류(노지 감귤, 한라봉 등) 병해충 전문가입니다.
                             첨부된 사진들을 꼼꼼하게 분석하고, 어떤 병이나 해충의 피해인지 종합적으로 진단해주세요.
@@ -680,10 +686,7 @@ else:
                             만약 감귤과 관련 없는 사진이거나 판독이 불가할 경우 "판독 불가"라고 명확히 밝혀주세요.
                             """
                             
-                            # 💡 프롬프트 텍스트와 여러 장의 PIL 이미지를 하나로 묶어서 동시에 전송
                             prompt_parts = [prompt] + pil_images
-                            
-                            # API 호출 수행
                             response = vision_model.generate_content(prompt_parts)
                             
                             st.success("✅ AI 정밀 판독이 완료되었습니다.")
