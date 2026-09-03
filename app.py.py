@@ -1,8 +1,8 @@
 # ==========================================
-# 📌 버전: 23.2 | 수정일시: 2026.09.02
+# 📌 버전: 24.0 | 수정일시: 2026.09.03
 # 📌 주요 수정내용: 
-#    1. URL 및 Key 자동 세탁 기능 추가 (PGRST125 에러 원천 차단)
-#    2. 이전 버전의 오타(df.nongyak -> df_nongyak) 수정 
+#    1. 데이터 공백(띄어쓰기) 자동 제거 로직 추가로 '자동완성(Auto-populate)' 기능 정상화
+#    2. DBbangje 저장 시 Qty, Tqty 숫자형 변환 및 예외 처리 추가 (bigint 에러 해결)
 # ==========================================
 
 import streamlit as st
@@ -24,15 +24,13 @@ st.set_page_config(page_title="내가 찾는 농약", page_icon="🍊", layout="
 # ==========================================
 @st.cache_resource
 def init_connection() -> Client:
-    # 1. 시크릿에서 값을 가져와서 양옆의 공백이나 불필요한 따옴표 제거
     raw_url = str(st.secrets["SUPABASE_URL"]).strip().strip("\"'")
     clean_key = str(st.secrets["SUPABASE_KEY"]).strip().strip("\"'")
     
-    # 2. URL 꼬리표 자동 절단 (PGRST125 에러 완벽 방지)
     clean_url = raw_url.rstrip("/")
     if clean_url.endswith("/rest/v1"):
         clean_url = clean_url[:-8]
-    clean_url = clean_url.rstrip("/") # 혹시 남은 빗금 한 번 더 제거
+    clean_url = clean_url.rstrip("/")
     
     return create_client(clean_url, clean_key)
 
@@ -139,10 +137,16 @@ def load_data_from_supabase():
                 elif clean_c == 'price': cols_map[c] = 'Price'
                 elif clean_c == 'byung': cols_map[c] = 'Byung'
                 elif clean_c == 'gyetong': cols_map[c] = 'Gyetong'
+            
             df_nongyak = df_nongyak.rename(columns=cols_map).fillna('')
             
+            # 💡 [핵심 수정] 엑셀에서 넘어온 보이지 않는 공백을 모든 열에서 강제 제거
+            for col in df_nongyak.columns:
+                if df_nongyak[col].dtype == object:
+                    df_nongyak[col] = df_nongyak[col].astype(str).str.strip()
+            
             if "Product Name" in df_nongyak.columns:
-                pesticide_list = sorted([str(n).strip() for n in df_nongyak["Product Name"].unique() if str(n).strip() and str(n) != 'nan'])
+                pesticide_list = sorted([str(n) for n in df_nongyak["Product Name"].unique() if str(n) and str(n) != 'nan'])
             else:
                 error_msgs.append(f"DBnongyak 'Product Name' 필드 인식 실패 (현재: {list(df_nongyak.columns)})")
                 
@@ -170,6 +174,10 @@ def load_data_from_supabase():
                 elif clean_c == '주작용기작': cols_map_moa[c] = '주 작용기작'
                 elif clean_c == '세부작용기작': cols_map_moa[c] = '세부 작용기작'
             df_moa = df_moa.rename(columns=cols_map_moa).fillna('')
+            
+            for col in df_moa.columns:
+                if df_moa[col].dtype == object:
+                    df_moa[col] = df_moa[col].astype(str).str.strip()
         else:
             error_msgs.append("DBkijak 테이블에 데이터가 비어있습니다.")
     except Exception as e:
@@ -658,12 +666,23 @@ else:
                     time_str = h_time.strftime("%I:%M %p").lstrip('0')
                     base_id = int(datetime.now().strftime("%y%m%d%H%M%S"))
                     
+                    # 💡 [핵심 수정] 수량(Qty)과 총살포량(Tqty)이 비어있거나 문자일 경우 예외처리(Null 처리)
+                    try:
+                        tqty_val = int(str(h_vol).replace(',', '')) if str(h_vol).strip() else None
+                    except:
+                        tqty_val = None
+                        
                     db_insert_data = []
                     for idx, rec in enumerate(records_to_add):
+                        try:
+                            qty_val = int(str(rec['qty']).replace(',', '')) if str(rec['qty']).strip() else None
+                        except:
+                            qty_val = None
+                            
                         db_insert_data.append({
                             "ID": base_id + idx, "Date": dt_str, "Time": time_str, "Nongyak": rec['name'],
-                            "Type": rec['type'], "Kijak": rec['moa'], "Spec": rec['size'], "Qty": rec['qty'],
-                            "Tqty": str(h_vol), "Byung": rec['pest'], "Remark": h_memo
+                            "Type": rec['type'], "Kijak": rec['moa'], "Spec": rec['size'], "Qty": qty_val,
+                            "Tqty": tqty_val, "Byung": rec['pest'], "Remark": h_memo
                         })
                     
                     try:
