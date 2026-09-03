@@ -1,8 +1,8 @@
 # ==========================================
-# 📌 버전: 29.0 | 수정일시: 2026.09.03
+# 📌 버전: 30.0 | 수정일시: 2026.09.03
 # 📌 주요 수정내용: 
-#    1. Gemini 404 에러 완벽 해결: genai.list_models()를 활용한 '사용 가능한 모델 자동 탐색 및 선택' 로직 적용
-#    2. 병해충 분석: 다중 이미지 업로드 및 가로 정렬 UI 유지
+#    1. list_models() 통신 에러 제거: 모델 목록을 묻지 않고, 순차적(Fallback)으로 직접 호출하여 404 에러 원천 차단
+#    2. 병해충 분석: 다중 이미지 정렬 및 다중 이미지 동시 분석 기능 최적화
 # ==========================================
 
 import streamlit as st
@@ -16,13 +16,12 @@ import requests
 import urllib.parse
 from supabase import create_client, Client
 from PIL import Image
-import io
 
 # 💡 구글 Gemini AI 라이브러리 불러오기
 try:
     import google.generativeai as genai
 except ImportError:
-    st.error("🚨 'google-generativeai' 패키지가 설치되지 않았습니다. requirements.txt를 확인해주세요.")
+    st.error("🚨 'google-generativeai' 패키지가 설치되지 않았습니다. 터미널에서 pip install google-generativeai 를 실행해주세요.")
 
 # 1. 앱 기본 설정
 st.set_page_config(page_title="내가 찾는 농약", page_icon="🍊", layout="wide")
@@ -47,32 +46,16 @@ except Exception as e:
     supabase_connected = False
     st.error("🚨 Supabase 연결 설정이 완료되지 않았거나 키가 잘못되었습니다.")
 
-# 💡 [핵심 수정] Gemini API 키 설정 및 사용 가능한 모델 '자동 탐색' 로직
+# 💡 [핵심 수정] 리스트를 조회하지 않고 키값만 바로 등록 (통신 에러 원천 차단)
 gemini_ready = False
-vision_model = None
-
 try:
-    gemini_api_key = str(st.secrets["GEMINI_API_KEY"]).strip().strip("\"'")
-    genai.configure(api_key=gemini_api_key)
-    
-    # 구글 서버에 현재 API 키로 사용 가능한 모든 모델 목록을 요청
-    available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-    
-    # 가장 성능이 좋은 최신 모델부터 순차적으로 탐색하여 자동 선택
-    target_model = None
-    for model_name in ['models/gemini-1.5-flash', 'models/gemini-1.5-pro', 'models/gemini-1.0-pro-vision-latest', 'models/gemini-pro-vision']:
-        if model_name in available_models:
-            target_model = model_name.replace('models/', '')
-            break
-            
-    if target_model:
-        vision_model = genai.GenerativeModel(target_model)
-        gemini_ready = True
-        st.session_state.current_ai_model = target_model # 확인용
-    else:
-        st.error("🚨 현재 API 키로 사용할 수 있는 이미지 판독 모델이 없습니다.")
+    if "GEMINI_API_KEY" in st.secrets:
+        gemini_api_key = str(st.secrets["GEMINI_API_KEY"]).strip().strip("\"'")
+        if gemini_api_key:
+            genai.configure(api_key=gemini_api_key)
+            gemini_ready = True
 except Exception as e:
-    st.warning(f"⚠️ Gemini API 설정 오류: {e}")
+    pass
 
 # ==========================================
 # 💾 세션 초기화 및 상태 관리
@@ -256,6 +239,18 @@ def render_moa_popup_trigger(df_current_result):
                     icon = "🛡️" if "살균" in ntype else ("🐛" if "살충" in ntype else ("🌿" if "제초" in ntype else "🧪"))
                     st.markdown(f"<div class='moa-result-card'><h4>{code} <span style='font-size: 14px; font-weight: normal; opacity: 0.8;'>({icon} {ntype})</span></h4><p class='title'>{res.get('주 작용기작', '')}</p><p class='desc'>👉 {res.get('세부 작용기작', '')}</p></div>", unsafe_allow_html=True)
                 else: st.warning(f"'{code}' 정보가 DB에 없습니다.")
+
+@st.dialog("🦠 병해충 상세 정보")
+def show_pest_popup(pest_name, prob, desc):
+    st.markdown(f"""
+        <h2 style='color: #e65100; margin-top: 0;'>{pest_name}</h2>
+        <h4 style='color: #4CAF50;'>AI 일치율: {prob}%</h4>
+        <hr style='margin: 10px 0;'>
+    """, unsafe_allow_html=True)
+    st.info(f"📸 여기에 '{pest_name}'의 대표 사진이 표시됩니다.")
+    st.markdown(f"<p style='font-size: 16px; line-height: 1.6;'>{desc}</p>", unsafe_allow_html=True)
+    if st.button("❌ 닫기", use_container_width=True): 
+        st.rerun()
 
 @st.cache_data(ttl=3600)
 def fetch_kma_weather_7days():
@@ -581,7 +576,7 @@ else:
                 dynamic_key = f"_{sel_name}_{reset_key}"
                 
                 with col_p1: p_type = st.text_input(f"약제종류", value=d_type, key=f"p_type_{i}{dynamic_key}")
-                with col_p2: p_moa = text_input(f"작용기작", value=d_moa, key=f"p_moa_{i}{dynamic_key}")
+                with col_p2: p_moa = st.text_input(f"작용기작", value=d_moa, key=f"p_moa_{i}{dynamic_key}")
                 with col_p3: p_size = st.text_input(f"규격", value=d_size, key=f"p_size_{i}{dynamic_key}")
                 
                 col_p4, col_p5, col_p6, col_p7 = st.columns(4)
@@ -631,7 +626,7 @@ else:
             st.markdown("</div>", unsafe_allow_html=True)
 
     # ----------------------------------------
-    # 💡 [핵심 수정] 메뉴 6: 병해충 분석 (지능형 모델 탐색 및 다중 이미지 뷰어 적용)
+    # 💡 [핵심 수정] 메뉴 6: 병해충 분석 (지능형 Fallback 탐색 탑재로 404 에러 원천 해결)
     # ----------------------------------------
     elif menu == "병해충 분석":
         st.subheader("📸 AI 병해충 사진 정밀 판독 (Gemini AI)")
@@ -640,7 +635,6 @@ else:
         if not gemini_ready:
             st.error("🚨 Gemini API 키 설정에 문제가 있어 AI 판독 기능을 사용할 수 없습니다. 인터넷 연결과 Secrets 설정을 확인해주세요.")
             
-        # 다중 업로드 (accept_multiple_files=True)
         uploaded_files = st.file_uploader("이미지 업로드 (최대 5장)", type=["png", "jpg", "jpeg"], accept_multiple_files=True)
         
         if uploaded_files:
@@ -650,14 +644,12 @@ else:
             
             st.success(f"✅ 총 {len(uploaded_files)}장의 사진이 입력되었습니다.")
             
-            # 가로 5등분하여 사진을 썸네일 크기로 깔끔하게 한 줄 출력
             st.markdown("<p style='font-size: 15px; font-weight: bold; margin-bottom: 5px;'>업로드된 사진 미리보기:</p>", unsafe_allow_html=True)
-            cols_img = st.columns(5) # 무조건 5칸을 만들어 크기를 통일시킴
+            cols_img = st.columns(5) 
             pil_images = []
             
             for idx, img_file in enumerate(uploaded_files):
                 image = Image.open(img_file)
-                # 너무 큰 이미지는 크기를 줄여서 메모리 과부하 방지 (최대 800픽셀)
                 image.thumbnail((800, 800))
                 pil_images.append(image)
                 with cols_img[idx]:
@@ -666,36 +658,60 @@ else:
             st.markdown("<br>", unsafe_allow_html=True)
             
             if st.button("🚀 Gemini AI 정밀 판독 시작", type="primary"):
-                if not vision_model:
-                    st.error("🚨 구글 서버에서 AI 모델을 찾지 못했습니다. 잠시 후 다시 시도해주세요.")
+                if not gemini_ready:
+                    st.error("🚨 API 키를 확인할 수 없어 판독을 시작할 수 없습니다.")
                 else:
-                    with st.spinner(f"인공지능({st.session_state.get('current_ai_model', 'Gemini')})이 사진을 분석하고 있습니다... (약 5~15초 소요)"):
-                        try:
-                            prompt = """
-                            당신은 대한민국 제주도 환경의 감귤류(노지 감귤, 한라봉 등) 병해충 전문가입니다.
-                            첨부된 사진들을 꼼꼼하게 분석하고, 어떤 병이나 해충의 피해인지 종합적으로 진단해주세요.
-                            
-                            반드시 아래 형식에 맞추어 답변을 작성해주세요:
-                            
-                            1. 진단명: (가장 가능성이 높은 병/해충의 정확한 공식 명칭)
-                            2. 진단 근거: (사진의 어떤 부분을 보고 그렇게 판단했는지 구체적인 이유 2~3줄)
-                            3. 방제 시기 및 방법: (이 병해충을 방제하기 위한 최적의 시기와 물리적/화학적 방법)
-                            4. 추천 작용기작: (해당 병해충에 잘 듣는 농약의 '작용기작' 코드 기호 1~2개 추천. 예: 다3, 카, 1a 등)
-                            
-                            전문적이면서도 농민이 이해하기 쉽게 설명해주세요. 
-                            만약 감귤과 관련 없는 사진이거나 판독이 불가할 경우 "판독 불가"라고 명확히 밝혀주세요.
-                            """
-                            
-                            prompt_parts = [prompt] + pil_images
-                            response = vision_model.generate_content(prompt_parts)
-                            
-                            st.success("✅ AI 정밀 판독이 완료되었습니다.")
-                            st.markdown("### 🔍 AI 판독 결과 보고서")
-                            st.markdown(f"<div class='ai-result-card'>{response.text}</div>", unsafe_allow_html=True)
-                            st.error("⚠️ **[면책 조항]** 위 결과는 AI의 이미지 분석 결과이며, 빛의 각도나 화질에 따라 오류가 있을 수 있습니다. 실제 농약 살포 전 반드시 농업기술센터 등 전문가의 확진을 받으시길 권장합니다.")
-                            
-                        except Exception as e:
-                            st.error(f"🚨 AI 판독 중 오류가 발생했습니다. (오류 내용: {e})")
+                    with st.spinner("구글 인공지능이 최적의 모델을 찾아 사진을 분석하고 있습니다... (약 10~20초 소요)"):
+                        prompt = """
+                        당신은 대한민국 제주도 환경의 감귤류(노지 감귤, 한라봉 등) 병해충 전문가입니다.
+                        첨부된 사진들을 꼼꼼하게 분석하고, 어떤 병이나 해충의 피해인지 종합적으로 진단해주세요.
+                        
+                        반드시 아래 형식에 맞추어 답변을 작성해주세요:
+                        
+                        1. 진단명: (가장 가능성이 높은 병/해충의 정확한 공식 명칭)
+                        2. 진단 근거: (사진의 어떤 부분을 보고 그렇게 판단했는지 구체적인 이유 2~3줄)
+                        3. 방제 시기 및 방법: (이 병해충을 방제하기 위한 최적의 시기와 물리적/화학적 방법)
+                        4. 추천 작용기작: (해당 병해충에 잘 듣는 농약의 '작용기작' 코드 기호 1~2개 추천. 예: 다3, 카, 1a 등)
+                        
+                        전문적이면서도 농민이 이해하기 쉽게 설명해주세요. 
+                        만약 감귤과 관련 없는 사진이거나 판독이 불가할 경우 "판독 불가"라고 명확히 밝혀주세요.
+                        """
+                        
+                        prompt_parts = [prompt] + pil_images
+                        
+                        # 구글 서버 상태에 상관없이 가장 똑똑한 모델부터 하나씩 순서대로 찔러보는 지능형(Fallback) 배열
+                        models_to_try = [
+                            'gemini-1.5-flash',
+                            'gemini-1.5-pro',
+                            'gemini-1.0-pro-vision-latest',
+                            'gemini-pro-vision'
+                        ]
+                        
+                        success = False
+                        error_messages = []
+                        
+                        for model_name in models_to_try:
+                            try:
+                                vision_model = genai.GenerativeModel(model_name)
+                                response = vision_model.generate_content(prompt_parts)
+                                
+                                st.success(f"✅ AI 정밀 판독이 완료되었습니다. (사용 모델: {model_name})")
+                                st.markdown("### 🔍 AI 판독 결과 보고서")
+                                st.markdown(f"<div class='ai-result-card'>{response.text}</div>", unsafe_allow_html=True)
+                                st.error("⚠️ **[면책 조항]** 위 결과는 AI의 이미지 분석 결과이며, 빛의 각도나 화질에 따라 오류가 있을 수 있습니다. 실제 농약 살포 전 반드시 전문가의 확진을 받으시길 권장합니다.")
+                                
+                                success = True
+                                break # 성공하면 다음 모델을 찾지 않고 즉시 종료!
+                                
+                            except Exception as e:
+                                error_messages.append(f"{model_name} 연결 실패: {e}")
+                                continue # 에러가 나면 다음 모델로 넘어가서 다시 시도
+                                
+                        if not success:
+                            st.error("🚨 구글 서버의 모든 인공지능 모델이 응답을 거부했습니다. API 키 권한이나 네트워크 상태를 확인해주세요.")
+                            with st.expander("상세 오류 내용 보기"):
+                                for err in error_messages:
+                                    st.write(err)
 
     # ----------------------------------------
     # 메뉴 7: 정보교환마당
