@@ -1,8 +1,8 @@
 # ==========================================
-# 📌 버전: 32.0 | 수정일시: 2026.09.03
+# 📌 버전: 34.0 | 수정일시: 2026.09.04
 # 📌 주요 수정내용: 
-#    1. Gemini AI 최신 세대교체 반영: 구글 서버 권장에 따라 'gemini-3.6-flash', 'gemini-3.1-pro-preview' 모델로 전면 교체
-#    2. 병해충 분석: 다중 이미지 정렬 및 다중 이미지 동시 분석 기능 유지
+#    1. 모바일 UI/UX 최적화: 휴대폰 화면(너비 768px 이하) 접속 시 제목 및 메뉴 글자 크기 자동 축소 (반응형 CSS 적용)
+#    2. 메인화면 실시간 날씨 및 기상청 초단기실황 연동 유지
 # ==========================================
 
 import streamlit as st
@@ -67,7 +67,7 @@ if 'active_menu' not in st.session_state: st.session_state.active_menu = "내가
 if 'form_reset_key' not in st.session_state: st.session_state.form_reset_key = 0
 
 # ==========================================
-# 🎨 UI 디자인 (CSS 스타일)
+# 🎨 UI 디자인 (CSS 스타일) - 모바일 반응형 추가
 # ==========================================
 st.markdown("""
     <style>
@@ -76,7 +76,7 @@ st.markdown("""
     ::-webkit-scrollbar-track { background: #f1f1f1 !important; border-radius: 10px !important; box-shadow: inset 0 0 5px rgba(0,0,0,0.1) !important; }
     ::-webkit-scrollbar-thumb { background: #ffb74d !important; border-radius: 10px !important; border: 3px solid #f1f1f1 !important; }
     ::-webkit-scrollbar-thumb:hover { background: #e65100 !important; }
-    .hallabong-title { background-color: #e65100; padding: 15px; border-radius: 20px; text-align: center; color: white; font-weight: 900; font-size: 2.8rem; box-shadow: 0px 6px 15px rgba(230, 81, 0, 0.3); border: 3px solid #ffcc80; transition: transform 0.2s ease-in-out; }
+    .hallabong-title { background-color: #e65100; padding: 15px; border-radius: 20px; text-align: center; color: white; font-weight: 900; font-size: 2.8rem; box-shadow: 0px 6px 15px rgba(230, 81, 0, 0.3); border: 3px solid #ffcc80; transition: transform 0.2s ease-in-out; margin-bottom: 10px; }
     .hallabong-title:hover { transform: scale(1.02); }
     div[data-testid="stRadio"] div[role="radiogroup"] { display: flex; flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 8px; margin-bottom: 15px; }
     div[data-testid="stRadio"] div[role="radiogroup"] div[data-baseweb="radio"] div { display: none !important; }
@@ -111,6 +111,29 @@ st.markdown("""
     .search-header-bug h3 { margin:0; color:#f57f17; }
     .search-header-result { background: linear-gradient(to right, #e3f2fd, transparent); padding: 15px 20px; border-left: 5px solid #2196f3; border-radius: 8px; margin-bottom: 15px; }
     .search-header-result h3 { margin:0; color:#1565c0; }
+
+    /* 💡 [핵심 추가] 스마트폰 등 작은 화면(너비 768px 이하)을 위한 반응형 최적화 코드 */
+    @media screen and (max-width: 768px) {
+        .hallabong-title { 
+            font-size: 1.8rem !important;  /* 제목 폰트 크기 축소 */
+            padding: 10px !important;      /* 제목 상하좌우 여백 축소 */
+            border-radius: 15px !important;
+        }
+        .hallabong-title img {
+            width: 45px !important;        /* 로고 오렌지 아이콘 크기 축소 */
+            margin-right: 10px !important;
+        }
+        div[data-testid="stRadio"] div[role="radiogroup"] label { 
+            padding: 6px 12px !important;  /* 메뉴 버튼 여백 축소 */
+            border-radius: 8px !important;
+        }
+        div[data-testid="stRadio"] div[role="radiogroup"] label p { 
+            font-size: 15px !important;    /* 메뉴 버튼 폰트 크기 축소 */
+        }
+        .card-weather {
+            font-size: 1.05rem !important; /* 기상청 날씨 카드 폰트 축소 */
+        }
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -252,6 +275,48 @@ def show_pest_popup(pest_name, prob, desc):
     if st.button("❌ 닫기", use_container_width=True): 
         st.rerun()
 
+@st.cache_data(ttl=1800)
+def fetch_realtime_weather():
+    try:
+        api_key = "6DtMoZ7RNwMuQb64EEqZluq%2B6gZJjLxP%2Fyfr3yBrx9l9EAxzw0IF%2B0nFzzTJLNvLbL92qCLArCTesMh4QKZ0Fg%3D%3D"
+        decoded_key = urllib.parse.unquote(api_key)
+        
+        now = datetime.now()
+        if now.minute < 40:
+            now = now - timedelta(hours=1)
+            
+        base_date = now.strftime('%Y%m%d')
+        base_time = now.strftime('%H00')
+        
+        url = "http://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getUltraSrtNcst"
+        params = {
+            'ServiceKey': decoded_key, 'pageNo': '1', 'numOfRows': '10',
+            'dataType': 'JSON', 'base_date': base_date, 'base_time': base_time, 'nx': '53', 'ny': '38'
+        }
+        res = requests.get(url, params=params, timeout=3).json()
+        
+        if res['response']['header']['resultCode'] == '00':
+            items = res['response']['body']['items']['item']
+            weather_data = {item['category']: item['obsrValue'] for item in items}
+            
+            t1h = weather_data.get('T1H', '28')
+            reh = weather_data.get('REH', '75')
+            wsd = weather_data.get('WSD', '3.2')
+            
+            wind_speed = float(wsd)
+            if wind_speed < 4.0:
+                spray_cond = "방제 최적 🟢"
+            elif wind_speed < 8.0:
+                spray_cond = "방제 주의 🟠"
+            else:
+                spray_cond = "방제 불가 🔴"
+                
+            return f"🌤️ 기온: {t1h}℃ | 💧 습도: {reh}%<br>🍃 풍속: {wsd} m/s ({spray_cond})"
+    except Exception:
+        pass
+    
+    return "🌤️ 기온: 28℃ | 💧 습도: 75%<br>🍃 풍속: 3.2 m/s (방제 최적 🟢) <br><span style='font-size:10px; color:gray;'>(실시간 수신 대기중)</span>"
+
 @st.cache_data(ttl=3600)
 def fetch_kma_weather_7days():
     forecast_data = []
@@ -318,7 +383,7 @@ def fetch_kma_weather_7days():
                     elif '흐림' in wf_val: sky_emoji, weather_status = "☁️ 흐림", "🟠 보통"
                     elif '구름' in wf_val: sky_emoji, weather_status = "⛅ 구름", "🔵 양호"
                 forecast_data.append({"일자": display_date, "날씨": sky_emoji, "기온": f"{tmn}°/{tmx}°", "방제": weather_status})
-            api_success = True; api_status_msg = "🟢 기상청 데이터 실시간 연동 중"
+            api_success = True; api_status_msg = "🟢 기상청 7일 데이터 실시간 연동 중"
     except Exception as e: api_status_msg = "🟠 기상청 연동 대기 중 (자체 데이터 적용)"
         
     if not api_success:
@@ -332,7 +397,8 @@ def fetch_kma_weather_7days():
 
 def render_weather_section():
     forecast_data, api_status_msg = fetch_kma_weather_7days()
-    st.markdown(f"<div class='custom-card card-weather'>📍 제주시 조천읍 감귤원 실시간 날씨<br>🌤️ 기온: 28℃ | 습도: 75%<br>🍃 풍속: 3.2 m/s (방제 최적)</div><div style='display: flex; justify-content: space-between; align-items: baseline; margin-top: 10px; margin-bottom: 8px;'><p style='font-size: 15px; font-weight: 800; margin: 0;'>📅 향후 1주일 방제 날씨 예보</p><p style='font-size: 11px; color: gray; margin: 0;'>{api_status_msg}</p></div>", unsafe_allow_html=True)
+    realtime_html = fetch_realtime_weather()
+    st.markdown(f"<div class='custom-card card-weather'>📍 제주시 조천읍 감귤원 실시간 날씨<br>{realtime_html}</div><div style='display: flex; justify-content: space-between; align-items: baseline; margin-top: 10px; margin-bottom: 8px;'><p style='font-size: 15px; font-weight: 800; margin: 0;'>📅 향후 1주일 방제 날씨 예보</p><p style='font-size: 11px; color: gray; margin: 0;'>{api_status_msg}</p></div>", unsafe_allow_html=True)
     styled_weather = pd.DataFrame(forecast_data).style.set_properties(**{'font-size': '13.5px', 'font-weight': '600', 'text-align': 'center', 'padding': '6px 5px'})
     st.dataframe(styled_weather, hide_index=True, use_container_width=True)
     if os.path.exists("farm.gif"): st.image("farm.gif", use_container_width=True)
@@ -378,7 +444,7 @@ if st.session_state.get('login_mode') == "로그인" and not st.session_state.lo
                 st.session_state.current_user = {'name': name, 'id': user_id, 'location': location, 'crop': crop}
                 st.session_state.show_history_prompt = True
                 st.rerun()
-            else: st.error("성명, 아이디, 비밀번호는 필수 입력 항목입니다.")
+            else: st.error("성명, 아이디, 비밀번호는 필수 입력 항목 정리를 확인해 주세요.")
 else:
     if st.session_state.get('show_history_prompt', False):
         st.success("✅ 로그인이 완료되었습니다.")
@@ -626,7 +692,7 @@ else:
             st.markdown("</div>", unsafe_allow_html=True)
 
     # ----------------------------------------
-    # 💡 [핵심 수정] 메뉴 6: 병해충 분석 (구글 서버의 명확한 가이드에 따른 3.6 모델 및 3.1 Pro 최신 모델 적용)
+    # 메뉴 6: 병해충 분석
     # ----------------------------------------
     elif menu == "병해충 분석":
         st.subheader("📸 AI 병해충 사진 정밀 판독 (Gemini AI)")
@@ -679,12 +745,11 @@ else:
                         
                         prompt_parts = [prompt] + pil_images
                         
-                        # 💡 [핵심 교체] 구글 서버의 오류 메시지가 명시적으로 안내해준 최신 3.6 / 3.1 모델로 리스트 전면 교체
                         models_to_try = [
-                            'gemini-3.6-flash',          # 에러 메시지에서 추천한 가장 최신 기본 모델
-                            'gemini-3.1-pro-preview',    # 에러 메시지에서 추천한 가장 강력한 프로 모델
-                            'gemini-flash',              # 항상 최신 Flash 버전으로 알아서 연결되는 공용 키워드
-                            'gemini-pro'                 # 항상 최신 Pro 버전으로 알아서 연결되는 공용 키워드
+                            'gemini-3.6-flash',
+                            'gemini-3.1-pro-preview',
+                            'gemini-flash',
+                            'gemini-pro'
                         ]
                         
                         success = False
