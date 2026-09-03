@@ -1,9 +1,9 @@
 # ==========================================
-# 📌 버전: 27.0 | 수정일시: 2026.09.03
+# 📌 버전: 28.0 | 수정일시: 2026.09.03
 # 📌 주요 수정내용: 
-#    1. Gemini API (gemini-1.5-flash) 통합: 가짜 데이터 제거 후 실시간 AI 병해충 사진 판독 구현
-#    2. Streamlit Secrets (GEMINI_API_KEY) 로드 및 인증 로직 추가
-#    3. Pillow (PIL) 라이브러리 연동으로 업로드된 이미지를 AI가 읽을 수 있는 형태로 변환
+#    1. 병해충 분석: 다중 이미지 업로드(accept_multiple_files=True) 복구
+#    2. 병해충 분석: 업로드된 이미지를 가로 한 줄(가변 컬럼)에 작게 정렬하여 표시
+#    3. Gemini API 404 에러 해결: 모델명을 'gemini-1.5-flash-latest'로 변경 및 다중 이미지 전송 로직 적용
 # ==========================================
 
 import streamlit as st
@@ -19,7 +19,7 @@ from supabase import create_client, Client
 from PIL import Image
 import io
 
-# 💡 [핵심 추가] 구글 Gemini AI 라이브러리 불러오기
+# 💡 구글 Gemini AI 라이브러리 불러오기
 try:
     import google.generativeai as genai
 except ImportError:
@@ -48,13 +48,13 @@ except Exception as e:
     supabase_connected = False
     st.error("🚨 Supabase 연결 설정이 완료되지 않았거나 키가 잘못되었습니다.")
 
-# 💡 [핵심 추가] Gemini API 키 설정 및 모델 준비
+# 💡 [핵심 수정] Gemini 404 에러 해결을 위해 -latest 명칭 사용
 gemini_ready = False
 try:
     gemini_api_key = str(st.secrets["GEMINI_API_KEY"]).strip().strip("\"'")
     genai.configure(api_key=gemini_api_key)
-    # 최신 이미지/텍스트 겸용 모델인 1.5 플래시 모델 선택
-    vision_model = genai.GenerativeModel('gemini-1.5-flash')
+    # 최신 버전을 확실하게 가리키도록 -latest 접미사 추가
+    vision_model = genai.GenerativeModel('gemini-1.5-flash-latest')
     gemini_ready = True
 except Exception as e:
     st.warning("⚠️ Gemini API 키(GEMINI_API_KEY)가 secrets에 등록되지 않아 AI 판독 기능이 제한됩니다.")
@@ -69,7 +69,7 @@ if 'active_menu' not in st.session_state: st.session_state.active_menu = "내가
 if 'form_reset_key' not in st.session_state: st.session_state.form_reset_key = 0
 
 # ==========================================
-# 🎨 UI 디자인 (CSS 스타일 생략 - 기존 동일)
+# 🎨 UI 디자인 (CSS 스타일)
 # ==========================================
 st.markdown("""
     <style>
@@ -241,6 +241,18 @@ def render_moa_popup_trigger(df_current_result):
                     icon = "🛡️" if "살균" in ntype else ("🐛" if "살충" in ntype else ("🌿" if "제초" in ntype else "🧪"))
                     st.markdown(f"<div class='moa-result-card'><h4>{code} <span style='font-size: 14px; font-weight: normal; opacity: 0.8;'>({icon} {ntype})</span></h4><p class='title'>{res.get('주 작용기작', '')}</p><p class='desc'>👉 {res.get('세부 작용기작', '')}</p></div>", unsafe_allow_html=True)
                 else: st.warning(f"'{code}' 정보가 DB에 없습니다.")
+
+@st.dialog("🦠 병해충 상세 정보")
+def show_pest_popup(pest_name, prob, desc):
+    st.markdown(f"""
+        <h2 style='color: #e65100; margin-top: 0;'>{pest_name}</h2>
+        <h4 style='color: #4CAF50;'>AI 일치율: {prob}%</h4>
+        <hr style='margin: 10px 0;'>
+    """, unsafe_allow_html=True)
+    st.info(f"📸 여기에 '{pest_name}'의 대표 사진이 표시됩니다.")
+    st.markdown(f"<p style='font-size: 16px; line-height: 1.6;'>{desc}</p>", unsafe_allow_html=True)
+    if st.button("❌ 닫기", use_container_width=True): 
+        st.rerun()
 
 @st.cache_data(ttl=3600)
 def fetch_kma_weather_7days():
@@ -616,32 +628,46 @@ else:
             st.markdown("</div>", unsafe_allow_html=True)
 
     # ----------------------------------------
-    # 💡 [핵심 추가] 메뉴 6: 병해충 분석 (Gemini API 1.5 Flash 연동)
+    # 💡 [핵심 수정] 메뉴 6: 병해충 분석 (다중 이미지 및 모델 버전 에러 완벽 해결)
     # ----------------------------------------
     elif menu == "병해충 분석":
         st.subheader("📸 AI 병해충 사진 정밀 판독 (Gemini 1.5 Flash)")
-        st.markdown("과수원에서 발견한 병해충 의심 사진을 업로드해 주세요. (가장 선명하게 찍힌 사진 1장 권장)")
+        st.markdown("과수원에서 발견한 병해충 의심 사진을 최대 5장까지 업로드해 주세요.")
         
-        uploaded_file = st.file_uploader("이미지 업로드 (1장)", type=["png", "jpg", "jpeg"])
+        # 1. 다중 업로드 복구 (accept_multiple_files=True)
+        uploaded_files = st.file_uploader("이미지 업로드 (최대 5장)", type=["png", "jpg", "jpeg"], accept_multiple_files=True)
         
-        if uploaded_file:
-            # 1. 업로드된 이미지를 화면에 표시
-            image = Image.open(uploaded_file)
-            st.image(image, caption="업로드된 사진", use_container_width=True)
+        if uploaded_files:
+            if len(uploaded_files) > 5:
+                st.warning("사진은 최대 5장까지 분석 가능합니다. 처음 5장의 사진만 판독합니다.")
+                uploaded_files = uploaded_files[:5]
+            
+            st.success(f"✅ 총 {len(uploaded_files)}장의 사진이 입력되었습니다.")
+            
+            # 2. 사진 크기 축소 및 가로 한 줄(컬럼) 정렬 표시
+            st.markdown("<p style='font-size: 15px; font-weight: bold; margin-bottom: 5px;'>업로드된 사진 미리보기:</p>", unsafe_allow_html=True)
+            cols_img = st.columns(len(uploaded_files))
+            pil_images = []
+            
+            for idx, img_file in enumerate(uploaded_files):
+                image = Image.open(img_file)
+                pil_images.append(image)
+                with cols_img[idx]:
+                    st.image(image, use_container_width=True)
             
             st.markdown("<br>", unsafe_allow_html=True)
             
-            # 2. 판독 시작 버튼
+            # 3. 판독 시작 버튼
             if st.button("🚀 Gemini AI 정밀 판독 시작", type="primary"):
                 if not gemini_ready:
                     st.error("🚨 Gemini API 키가 설정되지 않았습니다. 앱 설정(Secrets)에 GEMINI_API_KEY를 등록해주세요.")
                 else:
-                    with st.spinner("구글 Gemini 인공지능이 사진을 분석하고 있습니다... (약 5~10초 소요)"):
+                    with st.spinner("구글 Gemini 인공지능이 사진을 분석하고 있습니다... (약 5~15초 소요)"):
                         try:
-                            # 3. 인공지능에게 사진과 함께 내릴 구체적인 명령(프롬프트) 작성
+                            # AI에게 내릴 구체적인 명령
                             prompt = """
                             당신은 대한민국 제주도 환경의 감귤류(노지 감귤, 한라봉 등) 병해충 전문가입니다.
-                            첨부된 사진을 꼼꼼하게 분석하고, 어떤 병이나 해충의 피해인지 진단해주세요.
+                            첨부된 사진들을 꼼꼼하게 분석하고, 어떤 병이나 해충의 피해인지 종합적으로 진단해주세요.
                             
                             반드시 아래 형식에 맞추어 답변을 작성해주세요:
                             
@@ -654,19 +680,15 @@ else:
                             만약 감귤과 관련 없는 사진이거나 판독이 불가할 경우 "판독 불가"라고 명확히 밝혀주세요.
                             """
                             
-                            # 4. Gemini 모델에게 이미지와 명령 전달 및 답변 요청
-                            response = vision_model.generate_content([prompt, image])
+                            # 💡 프롬프트 텍스트와 여러 장의 PIL 이미지를 하나로 묶어서 동시에 전송
+                            prompt_parts = [prompt] + pil_images
                             
-                            # 5. 받은 답변을 화면에 멋지게 출력
+                            # API 호출 수행
+                            response = vision_model.generate_content(prompt_parts)
+                            
                             st.success("✅ AI 정밀 판독이 완료되었습니다.")
                             st.markdown("### 🔍 AI 판독 결과 보고서")
-                            
-                            st.markdown(f"""
-                            <div class='ai-result-card'>
-                                {response.text}
-                            </div>
-                            """, unsafe_allow_html=True)
-                            
+                            st.markdown(f"<div class='ai-result-card'>{response.text}</div>", unsafe_allow_html=True)
                             st.error("⚠️ **[면책 조항]** 위 결과는 AI의 이미지 분석 결과이며, 빛의 각도나 화질에 따라 오류가 있을 수 있습니다. 실제 농약 살포 전 반드시 농업기술센터 등 전문가의 확진을 받으시길 권장합니다.")
                             
                         except Exception as e:
