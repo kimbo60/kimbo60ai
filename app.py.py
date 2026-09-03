@@ -1,7 +1,7 @@
 # ==========================================
-# 📌 버전: 31.0 | 수정일시: 2026.09.03
+# 📌 버전: 32.0 | 수정일시: 2026.09.03
 # 📌 주요 수정내용: 
-#    1. Gemini AI 모델 세대교체 반영: 은퇴한 1.5 버전을 제외하고 최신 2.5, 2.0 모델(gemini-2.5-flash 등)로 전면 교체
+#    1. Gemini AI 최신 세대교체 반영: 구글 서버 권장에 따라 'gemini-3.6-flash', 'gemini-3.1-pro-preview' 모델로 전면 교체
 #    2. 병해충 분석: 다중 이미지 정렬 및 다중 이미지 동시 분석 기능 유지
 # ==========================================
 
@@ -239,6 +239,18 @@ def render_moa_popup_trigger(df_current_result):
                     icon = "🛡️" if "살균" in ntype else ("🐛" if "살충" in ntype else ("🌿" if "제초" in ntype else "🧪"))
                     st.markdown(f"<div class='moa-result-card'><h4>{code} <span style='font-size: 14px; font-weight: normal; opacity: 0.8;'>({icon} {ntype})</span></h4><p class='title'>{res.get('주 작용기작', '')}</p><p class='desc'>👉 {res.get('세부 작용기작', '')}</p></div>", unsafe_allow_html=True)
                 else: st.warning(f"'{code}' 정보가 DB에 없습니다.")
+
+@st.dialog("🦠 병해충 상세 정보")
+def show_pest_popup(pest_name, prob, desc):
+    st.markdown(f"""
+        <h2 style='color: #e65100; margin-top: 0;'>{pest_name}</h2>
+        <h4 style='color: #4CAF50;'>AI 일치율: {prob}%</h4>
+        <hr style='margin: 10px 0;'>
+    """, unsafe_allow_html=True)
+    st.info(f"📸 여기에 '{pest_name}'의 대표 사진이 표시됩니다.")
+    st.markdown(f"<p style='font-size: 16px; line-height: 1.6;'>{desc}</p>", unsafe_allow_html=True)
+    if st.button("❌ 닫기", use_container_width=True): 
+        st.rerun()
 
 @st.cache_data(ttl=3600)
 def fetch_kma_weather_7days():
@@ -614,7 +626,7 @@ else:
             st.markdown("</div>", unsafe_allow_html=True)
 
     # ----------------------------------------
-    # 💡 [핵심 수정] 메뉴 6: 병해충 분석 (최신 2.5 버전 AI 모델 전면 도입)
+    # 💡 [핵심 수정] 메뉴 6: 병해충 분석 (구글 서버의 명확한 가이드에 따른 3.6 모델 및 3.1 Pro 최신 모델 적용)
     # ----------------------------------------
     elif menu == "병해충 분석":
         st.subheader("📸 AI 병해충 사진 정밀 판독 (Gemini AI)")
@@ -649,7 +661,7 @@ else:
                 if not gemini_ready:
                     st.error("🚨 API 키를 확인할 수 없어 판독을 시작할 수 없습니다.")
                 else:
-                    with st.spinner("구글 인공지능이 최적의 모델을 찾아 사진을 분석하고 있습니다... (약 10~20초 소요)"):
+                    with st.spinner("구글 인공지능이 최적의 최신 모델을 찾아 사진을 분석하고 있습니다... (약 10~20초 소요)"):
                         prompt = """
                         당신은 대한민국 제주도 환경의 감귤류(노지 감귤, 한라봉 등) 병해충 전문가입니다.
                         첨부된 사진들을 꼼꼼하게 분석하고, 어떤 병이나 해충의 피해인지 종합적으로 진단해주세요.
@@ -667,12 +679,12 @@ else:
                         
                         prompt_parts = [prompt] + pil_images
                         
-                        # 💡 [핵심 교체] 은퇴한 1.5 버전을 제외하고 가장 새롭고 강력한 2.5 / 2.0 모델로 업데이트!
+                        # 💡 [핵심 교체] 구글 서버의 오류 메시지가 명시적으로 안내해준 최신 3.6 / 3.1 모델로 리스트 전면 교체
                         models_to_try = [
-                            'gemini-2.5-flash',
-                            'gemini-2.0-flash',
-                            'gemini-2.5-pro',
-                            'gemini-1.5-flash' # 혹시 모를 대비책
+                            'gemini-3.6-flash',          # 에러 메시지에서 추천한 가장 최신 기본 모델
+                            'gemini-3.1-pro-preview',    # 에러 메시지에서 추천한 가장 강력한 프로 모델
+                            'gemini-flash',              # 항상 최신 Flash 버전으로 알아서 연결되는 공용 키워드
+                            'gemini-pro'                 # 항상 최신 Pro 버전으로 알아서 연결되는 공용 키워드
                         ]
                         
                         success = False
