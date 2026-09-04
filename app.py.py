@@ -943,7 +943,7 @@ else:
                                 time.sleep(1)
                                 st.rerun()
                             except Exception as e: st.error(f"🚨 질문 등록 실패: {e}")
-                        else: st.warning("작성자명과 질문 내용을 모두 입력해주세요."
+                        else: st.warning("작성자명과 질문 내용을 모두 입력해주세요.")
 
     st.markdown("<br><br><br>---", unsafe_allow_html=True)
     st.caption("<div style='text-align: center; color: gray; font-size: 1.1em;'><b>Developed by KIMBO & Gemini</b></div>", unsafe_allow_html=True)
