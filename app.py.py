@@ -784,6 +784,10 @@ else:
     elif menu == "정보교환마당":
         st.subheader("💬 정보교환마당")
         
+        # 게시글 수정을 위한 세션 상태 초기화
+        if 'edit_post_id' not in st.session_state:
+            st.session_state.edit_post_id = None
+        
         df_board = pd.DataFrame()
         if supabase_connected:
             try:
@@ -793,19 +797,58 @@ else:
                 st.error(f"게시판 데이터 로딩 중 오류가 발생했습니다: {e}")
 
         col_notice, col_qa = st.columns(2)
+        
+        # --- 📢 공지사항 영역 ---
         with col_notice:
-            n_html = "<div class='custom-card card-notice'><h4>📢 공지사항</h4><hr><ul>"
+            st.markdown("<div class='custom-card card-notice' style='min-height: auto; padding: 15px; margin-bottom: 15px;'><h4 style='margin:0;'>📢 공지사항</h4></div>", unsafe_allow_html=True)
+            
             if not df_board.empty and 'Type' in df_board.columns:
                 df_notice = df_board[df_board['Type'] == '공지']
                 if not df_notice.empty:
                     for _, row in df_notice.iterrows():
-                        content = str(row.get('Content', '')).replace('\n', '<br>')
-                        date_str = str(row.get('created_at', ''))[:10]
-                        n_html += f"<li style='margin-bottom: 12px; line-height: 1.4;'>{content} <br><span style='font-size:12px; color:gray;'>({date_str})</span></li>"
-                else: n_html += "<li>등록된 공지사항이 없습니다.</li>"
-            else: n_html += "<li>등록된 공지사항이 없습니다.</li>"
-            n_html += "</ul></div>"
-            st.markdown(n_html, unsafe_allow_html=True)
+                        post_id = row['ID']
+                        
+                        # [수정 모드] 사용자가 '수정' 버튼을 누른 게시물인 경우 입력 폼 표시
+                        if st.session_state.edit_post_id == post_id:
+                            with st.form(key=f"edit_form_n_{post_id}"):
+                                new_content = st.text_area("공지 내용 수정", value=row.get('Content', ''))
+                                c1, c2 = st.columns(2)
+                                with c1: submit_edit = st.form_submit_button("저장", type="primary")
+                                with c2: cancel_edit = st.form_submit_button("취소")
+                                
+                                if submit_edit:
+                                    try:
+                                        supabase.table("DBboard").update({"Content": new_content}).eq("ID", post_id).execute()
+                                        st.session_state.edit_post_id = None
+                                        st.success("수정되었습니다.")
+                                        time.sleep(1)
+                                        st.rerun()
+                                    except Exception as e: st.error(f"수정 실패: {e}")
+                                if cancel_edit:
+                                    st.session_state.edit_post_id = None
+                                    st.rerun()
+                        # [일반 모드] 
+                        else:
+                            content = str(row.get('Content', '')).replace('\n', '<br>')
+                            date_str = str(row.get('created_at', ''))[:10]
+                            st.markdown(f"<div style='background-color: #fffde7; padding: 15px; border-radius: 8px; border: 1px solid #fdd835; margin-bottom: 8px;'><li style='margin-bottom: 5px; line-height: 1.4; list-style-type: none;'>{content} <br><span style='font-size:12px; color:gray;'>({date_str})</span></li></div>", unsafe_allow_html=True)
+                            
+                            # 로그인되어 있고, 현재 로그인한 아이디와 게시글 작성자 ID가 같을 때만 버튼 노출
+                            if st.session_state.logged_in and str(row.get('UserID')) == str(st.session_state.current_user.get('id', '')):
+                                c1, c2, _ = st.columns([1.5, 1.5, 7])
+                                with c1:
+                                    if st.button("수정", key=f"edit_btn_n_{post_id}", use_container_width=True):
+                                        st.session_state.edit_post_id = post_id
+                                        st.rerun()
+                                with c2:
+                                    if st.button("삭제", key=f"del_btn_n_{post_id}", use_container_width=True):
+                                        try:
+                                            supabase.table("DBboard").delete().eq("ID", post_id).execute()
+                                            st.rerun()
+                                        except Exception as e: st.error(f"삭제 실패: {e}")
+                            st.markdown("<div style='height: 5px;'></div>", unsafe_allow_html=True)
+                else: st.info("등록된 공지사항이 없습니다.")
+            else: st.info("등록된 공지사항이 없습니다.")
             
             with st.expander("➕ 공지 등록 (관리자용)"):
                 with st.form("notice_form", clear_on_submit=True):
@@ -824,24 +867,64 @@ else:
                             except Exception as e: st.error(f"🚨 공지 등록 실패: {e}")
                         else: st.warning("내용을 입력해주세요.")
 
+        # --- ❓ 질문하고 답하기 영역 ---
         with col_qa:
-            q_html = "<div class='custom-card card-qa'><h4>❓ 질문하고 답하기</h4><hr><div>"
+            st.markdown("<div class='custom-card card-qa' style='min-height: auto; padding: 15px; margin-bottom: 15px;'><h4 style='margin:0;'>❓ 질문하고 답하기</h4></div>", unsafe_allow_html=True)
+            
             if not df_board.empty and 'Type' in df_board.columns:
                 df_qa = df_board[df_board['Type'] == '질문']
                 if not df_qa.empty:
                     for _, row in df_qa.iterrows():
-                        author = row.get('Author', '익명')
-                        content = str(row.get('Content', '')).replace('\n', '<br>')
-                        reply = row.get('Reply', '')
-                        date_str = str(row.get('created_at', ''))[:10]
-                        q_html += f"<p style='margin-bottom: 5px; line-height: 1.4;'>👤 <b>{author}</b> <span style='font-size:11px; color:gray;'>{date_str}</span><br>{content}</p>"
-                        if pd.notna(reply) and str(reply).strip() and str(reply) != 'None' and str(reply) != 'nan':
-                            q_html += f"<p style='margin-left: 15px; color: #2e7d32; margin-top: 0; font-weight: bold;'>└ [답변] {str(reply).replace(chr(10), '<br>')}</p>"
-                        q_html += "<hr style='margin: 12px 0; border-top: 1px dashed #90caf9;'>"
-                else: q_html += "<p>등록된 질문이 없습니다.</p>"
-            else: q_html += "<p>등록된 질문이 없습니다.</p>"
-            q_html += "</div></div>"
-            st.markdown(q_html, unsafe_allow_html=True)
+                        post_id = row['ID']
+                        
+                        # [수정 모드]
+                        if st.session_state.edit_post_id == post_id:
+                            with st.form(key=f"edit_form_q_{post_id}"):
+                                new_content = st.text_area("질문 수정", value=row.get('Content', ''))
+                                c1, c2 = st.columns(2)
+                                with c1: submit_edit = st.form_submit_button("저장", type="primary")
+                                with c2: cancel_edit = st.form_submit_button("취소")
+                                
+                                if submit_edit:
+                                    try:
+                                        supabase.table("DBboard").update({"Content": new_content}).eq("ID", post_id).execute()
+                                        st.session_state.edit_post_id = None
+                                        st.success("수정되었습니다.")
+                                        time.sleep(1)
+                                        st.rerun()
+                                    except Exception as e: st.error(f"수정 실패: {e}")
+                                if cancel_edit:
+                                    st.session_state.edit_post_id = None
+                                    st.rerun()
+                        # [일반 모드]
+                        else:
+                            author = row.get('Author', '익명')
+                            content = str(row.get('Content', '')).replace('\n', '<br>')
+                            reply = row.get('Reply', '')
+                            date_str = str(row.get('created_at', ''))[:10]
+                            
+                            qa_html = f"<div style='background-color: #e3f2fd; padding: 15px; border-radius: 8px; border: 1px solid #90caf9; margin-bottom: 8px;'><p style='margin-bottom: 5px; line-height: 1.4;'>👤 <b>{author}</b> <span style='font-size:11px; color:gray;'>{date_str}</span><br>{content}</p>"
+                            if pd.notna(reply) and str(reply).strip() and str(reply) != 'None' and str(reply) != 'nan':
+                                qa_html += f"<p style='margin-left: 10px; color: #2e7d32; margin-top: 10px; font-weight: bold; border-left: 3px solid #2e7d32; padding-left: 10px;'>[답변]<br>{str(reply).replace(chr(10), '<br>')}</p>"
+                            qa_html += "</div>"
+                            st.markdown(qa_html, unsafe_allow_html=True)
+                            
+                            # 자신이 작성한 글인 경우 수정/삭제 버튼 노출
+                            if st.session_state.logged_in and str(row.get('UserID')) == str(st.session_state.current_user.get('id', '')):
+                                c1, c2, _ = st.columns([1.5, 1.5, 7])
+                                with c1:
+                                    if st.button("수정", key=f"edit_btn_q_{post_id}", use_container_width=True):
+                                        st.session_state.edit_post_id = post_id
+                                        st.rerun()
+                                with c2:
+                                    if st.button("삭제", key=f"del_btn_q_{post_id}", use_container_width=True):
+                                        try:
+                                            supabase.table("DBboard").delete().eq("ID", post_id).execute()
+                                            st.rerun()
+                                        except Exception as e: st.error(f"삭제 실패: {e}")
+                            st.markdown("<div style='height: 5px;'></div>", unsafe_allow_html=True)
+                else: st.info("등록된 질문이 없습니다.")
+            else: st.info("등록된 질문이 없습니다.")
             
             with st.expander("➕ 질문 남기기"):
                 with st.form("qa_form", clear_on_submit=True):
@@ -860,7 +943,7 @@ else:
                                 time.sleep(1)
                                 st.rerun()
                             except Exception as e: st.error(f"🚨 질문 등록 실패: {e}")
-                        else: st.warning("작성자명과 질문 내용을 모두 입력해주세요.")
+                        else: st.warning("작성자명과 질문 내용을 모두 입력해주세요."
 
     st.markdown("<br><br><br>---", unsafe_allow_html=True)
     st.caption("<div style='text-align: center; color: gray; font-size: 1.1em;'><b>Developed by KIMBO & Gemini</b></div>", unsafe_allow_html=True)
