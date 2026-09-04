@@ -1,11 +1,12 @@
 # ==========================================
-# 📌 버전: 34.1 | 수정일시: 2026.09.04
+# 📌 버전: 34.2 | 수정일시: 2026.09.04
 # 📌 주요 수정내용: 
 #    1. 모바일 UI/UX 최적화: 휴대폰 화면(너비 768px 이하) 접속 시 제목 및 메뉴 글자 크기 자동 축소 (반응형 CSS 적용)
 #    2. 메인화면 실시간 날씨 및 기상청 초단기실황 연동 유지
 #    3. 정보교환마당: 작성자 본인 글 수정/삭제 기능 추가
 #    4. 검색 메인화면 UI 최적화 및 총살포량(말/L) 자동 계산 기능 우측 배치
 #    5. 작용기작 검색 메뉴에 코드 형식 안내 이미지 추가 및 표 가운데 정렬 적용
+#    6. [NEW] 병해충 분석: 정밀판독 소요시간 안내 메시지 추가 및 초기화(중단/새로고침) 버튼 구현
 # ==========================================
 
 import streamlit as st
@@ -69,6 +70,7 @@ if 'current_user' not in st.session_state: st.session_state.current_user = {}
 if 'active_menu' not in st.session_state: st.session_state.active_menu = "내가 필요한 농약 찾기"
 if 'form_reset_key' not in st.session_state: st.session_state.form_reset_key = 0
 if 'edit_post_id' not in st.session_state: st.session_state.edit_post_id = None
+if 'pest_uploader_key' not in st.session_state: st.session_state.pest_uploader_key = 0 # 파일 업로더 초기화를 위한 키
 
 # ==========================================
 # 🎨 UI 디자인 (CSS 스타일) - 모바일 반응형 추가
@@ -748,7 +750,8 @@ else:
         if not gemini_ready:
             st.error("🚨 Gemini API 키 설정에 문제가 있어 AI 판독 기능을 사용할 수 없습니다. 인터넷 연결과 Secrets 설정을 확인해주세요.")
             
-        uploaded_files = st.file_uploader("이미지 업로드 (최대 5장)", type=["png", "jpg", "jpeg"], accept_multiple_files=True)
+        # 💡 [핵심] 파일 업로더에 동적인 key를 부여하여, 초기화 버튼 클릭 시 이전 파일이 모두 삭제되도록 구성
+        uploaded_files = st.file_uploader("이미지 업로드 (최대 5장)", type=["png", "jpg", "jpeg"], accept_multiple_files=True, key=f"pest_uploader_{st.session_state.pest_uploader_key}")
         
         if uploaded_files:
             if len(uploaded_files) > 5:
@@ -770,11 +773,24 @@ else:
             
             st.markdown("<br>", unsafe_allow_html=True)
             
-            if st.button("🚀 Gemini AI 정밀 판독 시작", type="primary"):
+            # 소요시간 안내 메시지 추가
+            st.markdown("<p style='color: #e65100; font-size: 15px; font-weight: bold; margin-bottom: 10px;'>💡 안내: 정밀판독에 약 2분 정도의 시간이 소요될 수 있습니다.</p>", unsafe_allow_html=True)
+            
+            # 판독 시작 및 초기화(중단) 버튼 가로 배치
+            col_start, col_reset = st.columns([7, 3])
+            with col_start:
+                start_btn = st.button("🚀 Gemini AI 정밀 판독 시작", type="primary", use_container_width=True)
+            with col_reset:
+                # 초기화(중단) 버튼을 누르면 세션 키가 변경되어 업로더와 결과 내역이 깨끗하게 리셋됩니다.
+                if st.button("⏹️ 판독 중단 및 새로하기", use_container_width=True):
+                    st.session_state.pest_uploader_key += 1
+                    st.rerun()
+            
+            if start_btn:
                 if not gemini_ready:
                     st.error("🚨 API 키를 확인할 수 없어 판독을 시작할 수 없습니다.")
                 else:
-                    with st.spinner("구글 인공지능이 최적의 최신 모델을 찾아 사진을 분석하고 있습니다... (약 10~20초 소요)"):
+                    with st.spinner("구글 인공지능이 최적의 최신 모델을 찾아 사진을 분석하고 있습니다... (약 2분 소요될 수 있습니다)"):
                         prompt = """
                         당신은 대한민국 제주도 환경의 감귤류(노지 감귤, 한라봉 등) 병해충 전문가입니다.
                         첨부된 사진들을 꼼꼼하게 분석하고, 어떤 병이나 해충의 피해인지 종합적으로 진단해주세요.
