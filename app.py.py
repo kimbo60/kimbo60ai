@@ -1,8 +1,11 @@
 # ==========================================
-# 📌 버전: 34.0 | 수정일시: 2026.09.04
+# 📌 버전: 34.1 | 수정일시: 2026.09.04
 # 📌 주요 수정내용: 
 #    1. 모바일 UI/UX 최적화: 휴대폰 화면(너비 768px 이하) 접속 시 제목 및 메뉴 글자 크기 자동 축소 (반응형 CSS 적용)
 #    2. 메인화면 실시간 날씨 및 기상청 초단기실황 연동 유지
+#    3. 정보교환마당: 작성자 본인 글 수정/삭제 기능 추가
+#    4. 검색 메인화면 UI 최적화 및 총살포량(말/L) 자동 계산 기능 추가
+#    5. 작용기작 검색 메뉴에 코드 형식 안내 이미지(image_5b2b02.png) 추가
 # ==========================================
 
 import streamlit as st
@@ -65,6 +68,7 @@ if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 if 'current_user' not in st.session_state: st.session_state.current_user = {}
 if 'active_menu' not in st.session_state: st.session_state.active_menu = "내가 필요한 농약 찾기"
 if 'form_reset_key' not in st.session_state: st.session_state.form_reset_key = 0
+if 'edit_post_id' not in st.session_state: st.session_state.edit_post_id = None
 
 # ==========================================
 # 🎨 UI 디자인 (CSS 스타일) - 모바일 반응형 추가
@@ -115,23 +119,23 @@ st.markdown("""
     /* 💡 [핵심 추가] 스마트폰 등 작은 화면(너비 768px 이하)을 위한 반응형 최적화 코드 */
     @media screen and (max-width: 768px) {
         .hallabong-title { 
-            font-size: 1.8rem !important;  /* 제목 폰트 크기 축소 */
-            padding: 10px !important;      /* 제목 상하좌우 여백 축소 */
+            font-size: 1.8rem !important;  
+            padding: 10px !important;      
             border-radius: 15px !important;
         }
         .hallabong-title img {
-            width: 45px !important;        /* 로고 오렌지 아이콘 크기 축소 */
+            width: 45px !important;        
             margin-right: 10px !important;
         }
         div[data-testid="stRadio"] div[role="radiogroup"] label { 
-            padding: 6px 12px !important;  /* 메뉴 버튼 여백 축소 */
+            padding: 6px 12px !important;  
             border-radius: 8px !important;
         }
         div[data-testid="stRadio"] div[role="radiogroup"] label p { 
-            font-size: 15px !important;    /* 메뉴 버튼 폰트 크기 축소 */
+            font-size: 15px !important;    
         }
         .card-weather {
-            font-size: 1.05rem !important; /* 기상청 날씨 카드 폰트 축소 */
+            font-size: 1.05rem !important; 
         }
     }
     </style>
@@ -480,20 +484,32 @@ else:
     if menu == "내가 필요한 농약 찾기":
         col_main, col_img = st.columns([7, 3])
         with col_main:
-            spray_date = st.date_input("약제살포 예정일", value=date.today())
-            weekdays_kr = ['월', '화', '수', '목', '금', '토', '일']
-            weekday_str = weekdays_kr[spray_date.weekday()]
-            st.markdown(f"<div style='color: #4CAF50; font-size: 16px; font-weight: bold; margin-top: -10px; margin-bottom: 5px; padding-left: 5px;'>👉 선택된 날짜: {spray_date.strftime('%Y년 %m월 %d일')} ({weekday_str}요일)</div>", unsafe_allow_html=True)
-            st.markdown("<p style='font-size:16px; font-weight:bold; color:#1565c0; margin-bottom: 15px; padding-left:5px;'>💡 안내: 살포하려는 농약 이름 또는 방제가 필요한 병해충 이름을 입력해주세요.</p>", unsafe_allow_html=True)
+            col_date, col_date_text = st.columns([3, 7])
+            with col_date:
+                spray_date = st.date_input("농약살포 희망일", value=date.today())
+            with col_date_text:
+                weekdays_kr = ['월', '화', '수', '목', '금', '토', '일']
+                weekday_str = weekdays_kr[spray_date.weekday()]
+                st.markdown(f"<div style='color: #4CAF50; font-size: 16px; font-weight: bold; margin-top: 32px; padding-left: 5px;'>👉 선택된 날짜: {spray_date.strftime('%Y년 %m월 %d일')} ({weekday_str}요일)</div>", unsafe_allow_html=True)
 
             with st.form("search_form"):
+                st.markdown("<div style='background-color:#e3f2fd; padding:12px; border-radius:8px; margin-bottom: 15px;'><p style='font-size:15px; font-weight:bold; color:#1565c0; margin:0;'>💡 안내: 살포하려는 농약 이름 또는 방제가 필요한 병해충 이름을 입력해주세요.</p></div>", unsafe_allow_html=True)
+
                 crop_type = st.selectbox("작물명", ["노지 감귤", "하우스 감귤", "비가림 감귤", "기타 과수"], index=0)
-                desired_pesticide = st.multiselect("희망 약제명 (검색/선택)", options=pesticide_list, placeholder="약제명 검색 또는 선택")
-                target_pest = st.multiselect("방제 대상 병해충 (검색/선택)", options=pest_list, placeholder="병해충명 검색 또는 선택")
-                st.markdown("<p style='font-size: 18px; font-weight: 800; margin-bottom: 5px; margin-top: 15px;'>총 살포량</p>", unsafe_allow_html=True)
-                col_vol1, col_vol2 = st.columns([2, 1], gap="small")
-                with col_vol1: total_volume = st.text_input("살포량 입력", placeholder="예: 1000", label_visibility="collapsed")
-                with col_vol2: volume_unit = st.selectbox("단위", ["L", "말"], index=0, label_visibility="collapsed")
+                desired_pesticide = st.multiselect("농약 이름 (검색/선택)", options=pesticide_list, placeholder="약제명 검색 또는 선택")
+                target_pest = st.multiselect("병해충 이름 (검색/선택)", options=pest_list, placeholder="병해충명 검색 또는 선택")
+                
+                st.markdown("<p style='font-size: 18px; font-weight: 800; margin-bottom: 5px; margin-top: 15px;'>총 살포량 [말]</p>", unsafe_allow_html=True)
+                total_volume = st.text_input("총 살포량", placeholder="예: 50", label_visibility="collapsed")
+                
+                if total_volume:
+                    if total_volume.isdigit():
+                        vol_mal = int(total_volume)
+                        vol_l = vol_mal * 20
+                        st.markdown(f"<p style='color:#e65100; font-weight:bold; font-size:16px; margin-top:-10px; padding-left:5px;'>✅ {vol_mal}말 ({vol_l}L)</p>", unsafe_allow_html=True)
+                    else:
+                        st.markdown("<p style='color:red; font-size:14px; margin-top:-10px; padding-left:5px;'>⚠️ 숫자만 입력해주세요.</p>", unsafe_allow_html=True)
+
                 submitted = st.form_submit_button("🔎 조건에 맞는 농약 찾기")
 
             if submitted:
@@ -552,21 +568,42 @@ else:
                         render_moa_popup_trigger(res)
 
     # ----------------------------------------
-    # 메뉴 4: 작용기작 찾기
+    # 메뉴 4: 작용기작 검색
     # ----------------------------------------
     elif menu == "작용기작 찾기":
         col_limit, _ = st.columns([7, 3])
         with col_limit:
-            st.subheader("🔬 작용기작 사전")
+            st.subheader("🔬 작용기작 검색")
             if df_moa_db.empty or '작용기작 코드' not in df_moa_db.columns: st.error("🚨 DB에서 작용기작 정보를 불러올 수 없습니다. 필드명이 올바른지 확인해주세요.")
             else:
                 moa_codes = sorted([str(code).strip() for code in df_moa_db['작용기작 코드'].unique() if str(code).strip() and str(code) != 'nan'])
                 search_moa = st.selectbox("궁금한 작용기작 코드 검색/선택:", options=moa_codes, index=None, placeholder="예: 가1, 1a, H01")
+                
                 if search_moa and search_moa.strip():
                     res = df_moa_db[df_moa_db['작용기작 코드'].astype(str) == search_moa].iloc[0]
                     ntype = res.get('농약종류', '')
                     icon = "🛡️" if "살균" in ntype else ("🐛" if "살충" in ntype else ("🌿" if "제초" in ntype else "🧪"))
                     st.markdown(f"<div class='custom-card card-moa'><div style='position: absolute; top: -15px; right: -15px; font-size: 110px; opacity: 0.05;'>{icon}</div><h2 style='margin-top: 0; font-size: 26px; font-weight: 900; margin-bottom: 25px;'><span style='background-color: #e65100; color: white; padding: 5px 15px; border-radius: 12px;'>{search_moa}</span><span class='moa-highlight' style='margin-left: 10px;'>작용기작 상세</span></h2><div class='moa-inner type'><p style='margin: 0; font-size: 14px; opacity: 0.8;'>분류 (농약종류)</p><p style='margin: 0; font-size: 20px; font-weight: 800;'>{icon} {ntype}</p></div><div class='moa-inner desc'><p style='margin: 0; font-size: 14px; opacity: 0.8;'>작용기작 구분 (대분류)</p><p style='margin: 0; font-size: 20px; font-weight: 800;'>🧬 {res.get('주 작용기작', '')}</p></div><div class='moa-inner detail'><p style='margin: 0; font-size: 15px; font-weight: 800; margin-bottom: 8px;'>세부 작용기작 및 계통(성분)</p><p style='margin: 0; font-size: 24px; color: #e57373; font-weight: 900; line-height: 1.4;'>🔬 {res.get('세부 작용기작', '')}</p></div></div>", unsafe_allow_html=True)
+                
+                st.markdown("<hr style='margin: 30px 0 15px 0;'>", unsafe_allow_html=True)
+                
+                if os.path.exists("image_5b2b02.png"):
+                    st.image("image_5b2b02.png", use_container_width=True)
+                else:
+                    st.markdown("<h4 style='text-align:center;'>&lt;&lt;작용기작 코드 형식&gt;&gt;</h4>", unsafe_allow_html=True)
+                    st.markdown("""
+                    | 🟣 살균제 코드 | 🟢 살충제 코드 | 🟡 제초제 코드 |
+                    | :---: | :---: | :---: |
+                    | 가1 | 1a | H01 |
+                    | 가2 | 1b | H02 |
+                    | 나1 | 2a | H09 |
+                    | 나2 | 2b | ..... |
+                    | 다1 | ..... | H19 |
+                    | ..... | 25b | H21 |
+                    | 차7 | 28 | H29 |
+                    | 카 | 29 | H34 |
+                    | 생2 | 30 | 미분류 |
+                    """, unsafe_allow_html=True)
 
     # ----------------------------------------
     # 메뉴 5: 나의 방제이력
@@ -784,10 +821,6 @@ else:
     elif menu == "정보교환마당":
         st.subheader("💬 정보교환마당")
         
-        # 게시글 수정을 위한 세션 상태 초기화
-        if 'edit_post_id' not in st.session_state:
-            st.session_state.edit_post_id = None
-        
         df_board = pd.DataFrame()
         if supabase_connected:
             try:
@@ -798,7 +831,6 @@ else:
 
         col_notice, col_qa = st.columns(2)
         
-        # --- 📢 공지사항 영역 ---
         with col_notice:
             st.markdown("<div class='custom-card card-notice' style='min-height: auto; padding: 15px; margin-bottom: 15px;'><h4 style='margin:0;'>📢 공지사항</h4></div>", unsafe_allow_html=True)
             
@@ -808,7 +840,6 @@ else:
                     for _, row in df_notice.iterrows():
                         post_id = row['ID']
                         
-                        # [수정 모드] 사용자가 '수정' 버튼을 누른 게시물인 경우 입력 폼 표시
                         if st.session_state.edit_post_id == post_id:
                             with st.form(key=f"edit_form_n_{post_id}"):
                                 new_content = st.text_area("공지 내용 수정", value=row.get('Content', ''))
@@ -827,13 +858,11 @@ else:
                                 if cancel_edit:
                                     st.session_state.edit_post_id = None
                                     st.rerun()
-                        # [일반 모드] 
                         else:
                             content = str(row.get('Content', '')).replace('\n', '<br>')
                             date_str = str(row.get('created_at', ''))[:10]
                             st.markdown(f"<div style='background-color: #fffde7; padding: 15px; border-radius: 8px; border: 1px solid #fdd835; margin-bottom: 8px;'><li style='margin-bottom: 5px; line-height: 1.4; list-style-type: none;'>{content} <br><span style='font-size:12px; color:gray;'>({date_str})</span></li></div>", unsafe_allow_html=True)
                             
-                            # 로그인되어 있고, 현재 로그인한 아이디와 게시글 작성자 ID가 같을 때만 버튼 노출
                             if st.session_state.logged_in and str(row.get('UserID')) == str(st.session_state.current_user.get('id', '')):
                                 c1, c2, _ = st.columns([1.5, 1.5, 7])
                                 with c1:
@@ -867,7 +896,6 @@ else:
                             except Exception as e: st.error(f"🚨 공지 등록 실패: {e}")
                         else: st.warning("내용을 입력해주세요.")
 
-        # --- ❓ 질문하고 답하기 영역 ---
         with col_qa:
             st.markdown("<div class='custom-card card-qa' style='min-height: auto; padding: 15px; margin-bottom: 15px;'><h4 style='margin:0;'>❓ 질문하고 답하기</h4></div>", unsafe_allow_html=True)
             
@@ -877,7 +905,6 @@ else:
                     for _, row in df_qa.iterrows():
                         post_id = row['ID']
                         
-                        # [수정 모드]
                         if st.session_state.edit_post_id == post_id:
                             with st.form(key=f"edit_form_q_{post_id}"):
                                 new_content = st.text_area("질문 수정", value=row.get('Content', ''))
@@ -896,7 +923,6 @@ else:
                                 if cancel_edit:
                                     st.session_state.edit_post_id = None
                                     st.rerun()
-                        # [일반 모드]
                         else:
                             author = row.get('Author', '익명')
                             content = str(row.get('Content', '')).replace('\n', '<br>')
@@ -909,7 +935,6 @@ else:
                             qa_html += "</div>"
                             st.markdown(qa_html, unsafe_allow_html=True)
                             
-                            # 자신이 작성한 글인 경우 수정/삭제 버튼 노출
                             if st.session_state.logged_in and str(row.get('UserID')) == str(st.session_state.current_user.get('id', '')):
                                 c1, c2, _ = st.columns([1.5, 1.5, 7])
                                 with c1:
