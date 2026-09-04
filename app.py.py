@@ -4,8 +4,8 @@
 #    1. 모바일 UI/UX 최적화: 휴대폰 화면(너비 768px 이하) 접속 시 제목 및 메뉴 글자 크기 자동 축소 (반응형 CSS 적용)
 #    2. 메인화면 실시간 날씨 및 기상청 초단기실황 연동 유지
 #    3. 정보교환마당: 작성자 본인 글 수정/삭제 기능 추가
-#    4. 검색 메인화면 UI 최적화 및 총살포량(말/L) 자동 계산 기능 추가
-#    5. 작용기작 검색 메뉴에 코드 형식 안내 이미지(image_5b2b02.png) 추가
+#    4. 검색 메인화면 UI 최적화 및 총살포량(말/L) 자동 계산 기능 우측 배치
+#    5. 작용기작 검색 메뉴에 코드 형식 안내 이미지 추가 및 표 가운데 정렬 적용
 # ==========================================
 
 import streamlit as st
@@ -500,15 +500,18 @@ else:
                 target_pest = st.multiselect("병해충 이름 (검색/선택)", options=pest_list, placeholder="병해충명 검색 또는 선택")
                 
                 st.markdown("<p style='font-size: 18px; font-weight: 800; margin-bottom: 5px; margin-top: 15px;'>총 살포량 [말]</p>", unsafe_allow_html=True)
-                total_volume = st.text_input("총 살포량", placeholder="예: 50", label_visibility="collapsed")
                 
-                if total_volume:
-                    if total_volume.isdigit():
-                        vol_mal = int(total_volume)
-                        vol_l = vol_mal * 20
-                        st.markdown(f"<p style='color:#e65100; font-weight:bold; font-size:16px; margin-top:-10px; padding-left:5px;'>✅ {vol_mal}말 ({vol_l}L)</p>", unsafe_allow_html=True)
-                    else:
-                        st.markdown("<p style='color:red; font-size:14px; margin-top:-10px; padding-left:5px;'>⚠️ 숫자만 입력해주세요.</p>", unsafe_allow_html=True)
+                col_vol_in, col_vol_out = st.columns([1, 3])
+                with col_vol_in:
+                    total_volume = st.text_input("총 살포량", placeholder="예: 50", label_visibility="collapsed")
+                with col_vol_out:
+                    if total_volume:
+                        if total_volume.isdigit():
+                            vol_mal = int(total_volume)
+                            vol_l = vol_mal * 20
+                            st.markdown(f"<p style='color:#e65100; font-weight:bold; font-size:18px; margin-top:5px; padding-left:10px;'>✅ {vol_mal}말 ({vol_l}L)</p>", unsafe_allow_html=True)
+                        else:
+                            st.markdown("<p style='color:red; font-size:15px; margin-top:8px; padding-left:10px;'>⚠️ 숫자만 입력해주세요.</p>", unsafe_allow_html=True)
 
                 submitted = st.form_submit_button("🔎 조건에 맞는 농약 찾기")
 
@@ -590,19 +593,26 @@ else:
                 if os.path.exists("image_5b2b02.png"):
                     st.image("image_5b2b02.png", use_container_width=True)
                 else:
-                    st.markdown("<h4 style='text-align:center;'>&lt;&lt;작용기작 코드 형식&gt;&gt;</h4>", unsafe_allow_html=True)
                     st.markdown("""
-                    | 🟣 살균제 코드 | 🟢 살충제 코드 | 🟡 제초제 코드 |
-                    | :---: | :---: | :---: |
-                    | 가1 | 1a | H01 |
-                    | 가2 | 1b | H02 |
-                    | 나1 | 2a | H09 |
-                    | 나2 | 2b | ..... |
-                    | 다1 | ..... | H19 |
-                    | ..... | 25b | H21 |
-                    | 차7 | 28 | H29 |
-                    | 카 | 29 | H34 |
-                    | 생2 | 30 | 미분류 |
+                    <div style="text-align: center;">
+                        <h4 style="margin-bottom: 15px; color: #333;">&lt;&lt;작용기작 코드 형식&gt;&gt;</h4>
+                        <table style="margin-left: auto; margin-right: auto; text-align: center; border-collapse: collapse; width: 90%; max-width: 600px; font-size: 16px;">
+                            <tr style="background-color: #f9f9f9;">
+                                <th style="padding: 10px; border: 1px solid #ddd;">🟣 살균제 코드</th>
+                                <th style="padding: 10px; border: 1px solid #ddd;">🟢 살충제 코드</th>
+                                <th style="padding: 10px; border: 1px solid #ddd;">🟡 제초제 코드</th>
+                            </tr>
+                            <tr><td style="padding: 8px; border: 1px solid #ddd;">가1</td><td style="padding: 8px; border: 1px solid #ddd;">1a</td><td style="padding: 8px; border: 1px solid #ddd;">H01</td></tr>
+                            <tr><td style="padding: 8px; border: 1px solid #ddd;">가2</td><td style="padding: 8px; border: 1px solid #ddd;">1b</td><td style="padding: 8px; border: 1px solid #ddd;">H02</td></tr>
+                            <tr><td style="padding: 8px; border: 1px solid #ddd;">나1</td><td style="padding: 8px; border: 1px solid #ddd;">2a</td><td style="padding: 8px; border: 1px solid #ddd;">H09</td></tr>
+                            <tr><td style="padding: 8px; border: 1px solid #ddd;">나2</td><td style="padding: 8px; border: 1px solid #ddd;">2b</td><td style="padding: 8px; border: 1px solid #ddd;">.....</td></tr>
+                            <tr><td style="padding: 8px; border: 1px solid #ddd;">다1</td><td style="padding: 8px; border: 1px solid #ddd;">.....</td><td style="padding: 8px; border: 1px solid #ddd;">H19</td></tr>
+                            <tr><td style="padding: 8px; border: 1px solid #ddd;">.....</td><td style="padding: 8px; border: 1px solid #ddd;">25b</td><td style="padding: 8px; border: 1px solid #ddd;">H21</td></tr>
+                            <tr><td style="padding: 8px; border: 1px solid #ddd;">차7</td><td style="padding: 8px; border: 1px solid #ddd;">28</td><td style="padding: 8px; border: 1px solid #ddd;">H29</td></tr>
+                            <tr><td style="padding: 8px; border: 1px solid #ddd;">카</td><td style="padding: 8px; border: 1px solid #ddd;">29</td><td style="padding: 8px; border: 1px solid #ddd;">H34</td></tr>
+                            <tr><td style="padding: 8px; border: 1px solid #ddd;">생2</td><td style="padding: 8px; border: 1px solid #ddd;">30</td><td style="padding: 8px; border: 1px solid #ddd;">미분류</td></tr>
+                        </table>
+                    </div>
                     """, unsafe_allow_html=True)
 
     # ----------------------------------------
