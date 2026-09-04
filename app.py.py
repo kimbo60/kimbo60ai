@@ -1,12 +1,13 @@
 # ==========================================
-# 📌 버전: 34.2 | 수정일시: 2026.09.04
+# 📌 버전: 34.3 | 수정일시: 2026.09.04
 # 📌 주요 수정내용: 
 #    1. 모바일 UI/UX 최적화: 휴대폰 화면(너비 768px 이하) 접속 시 제목 및 메뉴 글자 크기 자동 축소 (반응형 CSS 적용)
 #    2. 메인화면 실시간 날씨 및 기상청 초단기실황 연동 유지
 #    3. 정보교환마당: 작성자 본인 글 수정/삭제 기능 추가
 #    4. 검색 메인화면 UI 최적화 및 총살포량(말/L) 자동 계산 기능 우측 배치
 #    5. 작용기작 검색 메뉴에 코드 형식 안내 이미지 추가 및 표 가운데 정렬 적용
-#    6. [NEW] 병해충 분석: 정밀판독 소요시간 안내 메시지 추가 및 초기화(중단/새로고침) 버튼 구현
+#    6. 병해충 분석: 정밀판독 소요시간 안내 메시지 추가 및 초기화(중단/새로고침) 버튼 구현
+#    7. [NEW] 내가 필요한 농약 찾기: 다중 병해충 검색 시 AND 조건 적용 및 공통 약제 없을 시 개별 안내 추가
 # ==========================================
 
 import streamlit as st
@@ -518,14 +519,36 @@ else:
                 submitted = st.form_submit_button("🔎 조건에 맞는 농약 찾기")
 
             if submitted:
-                if not desired_pesticide and not target_pest: st.error("⚠️ 희망 약제명 또는 발생 병해충을 하나 이상 검색/선택해 주세요.")
+                if not desired_pesticide and not target_pest: 
+                    st.error("⚠️ 희망 약제명 또는 발생 병해충을 하나 이상 검색/선택해 주세요.")
+                    st.session_state.df_result = pd.DataFrame()
                 else:
                     filtered_df = df_database.copy()
-                    if target_pest: filtered_df = filtered_df[filtered_df['Byung'].astype(str).str.contains('|'.join(target_pest))]
-                    if desired_pesticide: filtered_df = filtered_df[filtered_df['Product Name'].isin(desired_pesticide)]
+                    if desired_pesticide: 
+                        filtered_df = filtered_df[filtered_df['Product Name'].isin(desired_pesticide)]
+                    if target_pest: 
+                        for pest in target_pest:
+                            filtered_df = filtered_df[filtered_df['Byung'].astype(str).str.contains(pest)]
+                    
                     st.session_state.df_result = filtered_df
-                    if filtered_df.empty: st.error("조건에 맞는 약제가 없습니다.")
-                    else: st.success(f"✅ 총 {len(filtered_df)}개의 약제가 검색되었습니다.")
+                    
+                    if filtered_df.empty:
+                        if target_pest and len(target_pest) > 1:
+                            st.error("🚨 선택하신 병해충을 모두 동시에 방제할 수 있는 농약은 없습니다.")
+                            st.markdown("#### 💡 각 병해충 조건별 적용 가능한 농약")
+                            base_df = df_database.copy()
+                            if desired_pesticide:
+                                base_df = base_df[base_df['Product Name'].isin(desired_pesticide)]
+                            for val in target_pest:
+                                individual_res = base_df[base_df['Byung'].astype(str).str.contains(val)]
+                                if not individual_res.empty: 
+                                    st.info(f"**[{val}]** : {', '.join(individual_res['Product Name'].unique().tolist())}")
+                                else: 
+                                    st.warning(f"**[{val}]** : 조건에 맞는 등록 농약이 없습니다.")
+                        else:
+                            st.error("조건에 맞는 약제가 없습니다.")
+                    else: 
+                        st.success(f"✅ 총 {len(filtered_df)}개의 약제가 검색되었습니다.")
 
             if 'df_result' in st.session_state and not st.session_state.df_result.empty:
                 render_styled_dataframe(st.session_state.df_result)
@@ -750,7 +773,6 @@ else:
         if not gemini_ready:
             st.error("🚨 Gemini API 키 설정에 문제가 있어 AI 판독 기능을 사용할 수 없습니다. 인터넷 연결과 Secrets 설정을 확인해주세요.")
             
-        # 💡 [핵심] 파일 업로더에 동적인 key를 부여하여, 초기화 버튼 클릭 시 이전 파일이 모두 삭제되도록 구성
         uploaded_files = st.file_uploader("이미지 업로드 (최대 5장)", type=["png", "jpg", "jpeg"], accept_multiple_files=True, key=f"pest_uploader_{st.session_state.pest_uploader_key}")
         
         if uploaded_files:
@@ -773,15 +795,12 @@ else:
             
             st.markdown("<br>", unsafe_allow_html=True)
             
-            # 소요시간 안내 메시지 추가
             st.markdown("<p style='color: #e65100; font-size: 15px; font-weight: bold; margin-bottom: 10px;'>💡 안내: 정밀판독에 약 2분 정도의 시간이 소요될 수 있습니다.</p>", unsafe_allow_html=True)
             
-            # 판독 시작 및 초기화(중단) 버튼 가로 배치
             col_start, col_reset = st.columns([7, 3])
             with col_start:
                 start_btn = st.button("🚀 Gemini AI 정밀 판독 시작", type="primary", use_container_width=True)
             with col_reset:
-                # 초기화(중단) 버튼을 누르면 세션 키가 변경되어 업로더와 결과 내역이 깨끗하게 리셋됩니다.
                 if st.button("⏹️ 판독 중단 및 새로하기", use_container_width=True):
                     st.session_state.pest_uploader_key += 1
                     st.rerun()
