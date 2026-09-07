@@ -1,5 +1,5 @@
 # ==========================================
-# 📌 버전: 34.5 | 수정일시: 2026.09.07
+# 📌 버전: 34.6 | 수정일시: 2026.09.07
 # 📌 주요 수정내용: 
 #    1. 모바일 UI/UX 최적화: 휴대폰 화면(너비 768px 이하) 접속 시 제목 및 메뉴 글자 크기 자동 축소 (반응형 CSS 적용)
 #    2. 메인화면 실시간 날씨 및 기상청 초단기실황 연동 유지
@@ -9,7 +9,7 @@
 #    6. 병해충 분석: 정밀판독 소요시간 안내 메시지 추가 및 초기화(중단/새로고침) 버튼 구현
 #    7. 내가 필요한 농약 찾기: 다중 병해충 검색 시 AND 조건 적용 및 공통 약제 없을 시 개별 안내 추가
 #    8. 농약 검색 결과 표 고도화: '나의 방제이력' 작용기작 연동 (이력 유무에 따른 적색/청색 표시)
-#    9. [NEW] 방제이력 매칭 오류 수정: 빈 값(nan) 교차 검증 예외 처리 및 날짜 6자리(YYMMDD) 텍스트 포맷 적용
+#    9. [NEW] 방제이력 매칭 완벽 수정: 작용기작 부분 일치 오류 해결 -> 100% 완전 일치 시에만 6자리 날짜(YYMMDD) 표시
 # ==========================================
 
 import streamlit as st
@@ -236,42 +236,48 @@ def fetch_spray_history():
 df_database, df_moa_db, pesticide_list, pest_list, db_error_msg = load_data_from_supabase()
 
 def render_styled_dataframe(df):
-    # 최신 방제이력 가져오기
     df_hist = fetch_spray_history()
     
-    # 💡 [핵심 수정] 방제이력 체크 로직 (Kijak 비교 보완 및 6자리 포맷)
+    # 💡 [완벽 수정] 작용기작 100% 완전 일치 시에만 날짜를 매칭하는 로직
     history_col = []
     for idx, row in df.iterrows():
         k = str(row.get('Kijak', '')).strip()
         
-        # 작용기작이 명확하지 않은 경우 (결측치) 제외 처리
-        if not k or k.lower() == 'nan':
+        # 제외할 비정상 작용기작 값들
+        if not k or k.lower() == 'nan' or k in ['미분류', '-', '없음', '기타', '?']:
             history_col.append("없음")
             continue
             
-        current_moas = [m.strip() for m in k.replace('/', '+').split('+') if m.strip() and m.strip().lower() != 'nan']
-        matched_dates = set()
+        # 현재 농약의 작용기작을 분리하고 정렬하여 완전한 고유 키 생성 (예: '4a', '9b' -> '4a+9b')
+        current_moas = sorted([m.strip() for m in re.split(r'[/+,]', k) if m.strip() and m.strip().lower() != 'nan'])
+        current_moa_key = "+".join(current_moas)
         
-        if current_moas and not df_hist.empty and 'Kijak' in df_hist.columns:
+        if not current_moa_key:
+            history_col.append("없음")
+            continue
+            
+        matched_dates = set()
+        if not df_hist.empty and 'Kijak' in df_hist.columns:
             for _, h_row in df_hist.iterrows():
                 hist_k = str(h_row.get('Kijak', '')).strip()
-                if not hist_k or hist_k.lower() == 'nan':
+                if not hist_k or hist_k.lower() == 'nan' or hist_k in ['미분류', '-', '없음', '기타', '?']:
                     continue
                 
-                hist_moas = [m.strip() for m in hist_k.replace('/', '+').split('+') if m.strip() and m.strip().lower() != 'nan']
+                # 과거 살포했던 농약의 작용기작도 분리 및 정렬하여 키 생성
+                hist_moas = sorted([m.strip() for m in re.split(r'[/+,]', hist_k) if m.strip() and m.strip().lower() != 'nan'])
+                hist_moa_key = "+".join(hist_moas)
                 
-                # 교차 검증: 하나라도 일치하는 작용기작이 과거 기록에 있는지 확인
-                if set(current_moas) & set(hist_moas):
+                # 💡 핵심: 조합이 100% 똑같을 때만 매칭 성공으로 간주
+                if current_moa_key == hist_moa_key:
                     dt_str = str(h_row.get('Date', '')).strip()
                     if dt_str and dt_str.lower() != 'nan':
-                        # 날짜를 6자리(YYMMDD)로 변환
                         clean_dt = dt_str.replace('-', '').replace('.', '').replace('/', '')
-                        if len(clean_dt) >= 8: # YYYYMMDD 형태인 경우
+                        if len(clean_dt) >= 8: # YYYYMMDD -> YYMMDD 6자리 변환
                             matched_dates.add(clean_dt[2:8])
                         elif len(clean_dt) == 6:
                             matched_dates.add(clean_dt)
                         else:
-                            matched_dates.add(clean_dt) # 예외 데이터
+                            matched_dates.add(clean_dt)
         
         if matched_dates:
             sorted_dates = sorted(list(matched_dates), reverse=True)
@@ -279,34 +285,30 @@ def render_styled_dataframe(df):
         else:
             history_col.append("없음")
             
-    # '방제이력' 파생 컬럼 생성
     df = df.copy()
     df['방제이력'] = history_col
     
-    # 출력 열 순서 지정 ('방제이력'을 '상품명' 바로 뒤에 배치)
     display_columns = ['Type', 'Product Name', '방제이력', 'Kijak', 'Spec', 'Usage', 'Price', 'Byung', 'Gyetong']
     df = df[[col for col in display_columns if col in df.columns]].copy()
     
     if 'Price' in df.columns: df['Price'] = pd.to_numeric(df['Price'].astype(str).str.replace(',', ''), errors='coerce')
     
     rename_dict = {
-        'Type': '종류', 'Product Name': '상품명', 'Kijak': '작용기작', 
+        'Type': '종류', 'Product Name': '상품명', '방제이력': '방제이력', 'Kijak': '작용기작', 
         'Spec': '규격', 'Usage': '사용량', 'Price': '금액 (원)', 
         'Byung': '적용병해충', 'Gyetong': '계통'
     }
     df = df.rename(columns=rename_dict)
     
-    # 💡 컬러 스타일링 함수 (방제이력이 있으면 빨간색, 없으면 파란색)
     def color_rows(row):
         if row.get('방제이력', '없음') != '없음':
-            return ['color: #d32f2f; font-weight: 600;'] * len(row) # Red (위험/중복 주의)
+            return ['color: #d32f2f; font-weight: 600;'] * len(row) # 빨간색
         else:
-            return ['color: #1976d2; font-weight: 600;'] * len(row) # Blue (안전/신규)
+            return ['color: #1976d2; font-weight: 600;'] * len(row) # 파란색
 
     styled_df = df.style.apply(color_rows, axis=1)
     styled_df = styled_df.set_properties(**{'font-size': '15px', 'padding': '8px 10px', 'text-align': 'center'})
     
-    # 텍스트가 긴 컬럼은 좌측 정렬 처리
     left_cols = [c for c in df.columns if c in ['상품명', '방제이력', '적용병해충', '계통']]
     if left_cols: styled_df = styled_df.set_properties(subset=left_cols, **{'text-align': 'left'})
     if '금액 (원)' in df.columns: styled_df = styled_df.set_properties(subset=['금액 (원)'], **{'text-align': 'right'}).format({'금액 (원)': '{:,.0f}'}, na_rep="")
@@ -871,7 +873,7 @@ else:
             
             if start_btn:
                 if not gemini_ready:
-                    st.error("🚨 API 키를 확인할 수 없어 판독을 시작할 수 없습니다.")
+                    st.error("🚨 API 키를 확인할 수 없어 판독 시작할 수 없습니다.")
                 else:
                     with st.spinner("구글 인공지능이 최적의 최신 모델을 찾아 사진을 분석하고 있습니다... (약 2분 소요될 수 있습니다)"):
                         prompt = """
