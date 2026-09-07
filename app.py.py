@@ -1,5 +1,5 @@
 # ==========================================
-# 📌 버전: 34.3 | 수정일시: 2026.09.04
+# 📌 버전: 34.4 | 수정일시: 2026.09.07
 # 📌 주요 수정내용: 
 #    1. 모바일 UI/UX 최적화: 휴대폰 화면(너비 768px 이하) 접속 시 제목 및 메뉴 글자 크기 자동 축소 (반응형 CSS 적용)
 #    2. 메인화면 실시간 날씨 및 기상청 초단기실황 연동 유지
@@ -7,7 +7,8 @@
 #    4. 검색 메인화면 UI 최적화 및 총살포량(말/L) 자동 계산 기능 우측 배치
 #    5. 작용기작 검색 메뉴에 코드 형식 안내 이미지 추가 및 표 가운데 정렬 적용
 #    6. 병해충 분석: 정밀판독 소요시간 안내 메시지 추가 및 초기화(중단/새로고침) 버튼 구현
-#    7. [NEW] 내가 필요한 농약 찾기: 다중 병해충 검색 시 AND 조건 적용 및 공통 약제 없을 시 개별 안내 추가
+#    7. 내가 필요한 농약 찾기: 다중 병해충 검색 시 AND 조건 적용 및 공통 약제 없을 시 개별 안내 추가
+#    8. [NEW] 농약 검색 결과 표 고도화: '나의 방제이력' 작용기작 연동 (이력 유무에 따른 적색/청색 표시 및 살포일자 표시 추가)
 # ==========================================
 
 import streamlit as st
@@ -71,7 +72,7 @@ if 'current_user' not in st.session_state: st.session_state.current_user = {}
 if 'active_menu' not in st.session_state: st.session_state.active_menu = "내가 필요한 농약 찾기"
 if 'form_reset_key' not in st.session_state: st.session_state.form_reset_key = 0
 if 'edit_post_id' not in st.session_state: st.session_state.edit_post_id = None
-if 'pest_uploader_key' not in st.session_state: st.session_state.pest_uploader_key = 0 # 파일 업로더 초기화를 위한 키
+if 'pest_uploader_key' not in st.session_state: st.session_state.pest_uploader_key = 0 
 
 # ==========================================
 # 🎨 UI 디자인 (CSS 스타일) - 모바일 반응형 추가
@@ -234,20 +235,68 @@ def fetch_spray_history():
 df_database, df_moa_db, pesticide_list, pest_list, db_error_msg = load_data_from_supabase()
 
 def render_styled_dataframe(df):
-    display_columns = ['Type', 'Product Name', 'Kijak', 'Spec', 'Usage', 'Price', 'Byung', 'Gyetong']
+    # 최신 방제이력 가져오기
+    df_hist = fetch_spray_history()
+    
+    # 💡 방제이력 체크 로직 (Kijak 비교)
+    history_col = []
+    for idx, row in df.iterrows():
+        k = str(row.get('Kijak', '')).strip()
+        
+        # 작용기작이 '가1+다3' 처럼 섞여있을 수 있으므로 분리
+        current_moas = [m.strip() for m in k.replace('/', '+').split('+') if m.strip()]
+        matched_dates = set()
+        
+        if current_moas and not df_hist.empty and 'Kijak' in df_hist.columns:
+            for _, h_row in df_hist.iterrows():
+                hist_k = str(h_row.get('Kijak', ''))
+                hist_moas = [m.strip() for m in hist_k.replace('/', '+').split('+') if m.strip()]
+                
+                # 교차 검증: 하나라도 일치하는 작용기작이 과거 기록에 있는지 확인
+                if set(current_moas) & set(hist_moas):
+                    dt = str(h_row.get('Date', ''))
+                    if dt:
+                        matched_dates.add(dt)
+        
+        if matched_dates:
+            sorted_dates = sorted(list(matched_dates), reverse=True)
+            history_col.append(", ".join(sorted_dates))
+        else:
+            history_col.append("없음")
+            
+    # 'History_Dates' 파생 컬럼 생성
+    df = df.copy()
+    df['History_Dates'] = history_col
+    
+    # 출력 열 순서 지정 ('방제이력'을 '상품명' 바로 뒤에 배치)
+    display_columns = ['Type', 'Product Name', 'History_Dates', 'Kijak', 'Spec', 'Usage', 'Price', 'Byung', 'Gyetong']
     df = df[[col for col in display_columns if col in df.columns]].copy()
+    
     if 'Price' in df.columns: df['Price'] = pd.to_numeric(df['Price'].astype(str).str.replace(',', ''), errors='coerce')
+    
     rename_dict = {
-        'Type': '종류', 'Product Name': '상품명', 'Kijak': '작용기작', 
+        'Type': '종류', 'Product Name': '상품명', 'History_Dates': '방제이력', 'Kijak': '작용기작', 
         'Spec': '규격', 'Usage': '사용량', 'Price': '금액 (원)', 
         'Byung': '적용병해충', 'Gyetong': '계통'
     }
     df = df.rename(columns=rename_dict)
-    styled_df = df.style.set_properties(**{'font-size': '15px', 'font-weight': '600', 'padding': '8px 10px', 'text-align': 'center'})
-    left_cols = [c for c in df.columns if c in ['적용병해충', '계통']]
+    
+    # 💡 컬러 스타일링 함수 (방제이력이 있으면 빨간색, 없으면 파란색)
+    def color_rows(row):
+        if row.get('방제이력', '없음') != '없음':
+            return ['color: #d32f2f; font-weight: 600;'] * len(row) # Red (위험/중복 주의)
+        else:
+            return ['color: #1976d2; font-weight: 600;'] * len(row) # Blue (안전/신규)
+
+    styled_df = df.style.apply(color_rows, axis=1)
+    styled_df = styled_df.set_properties(**{'font-size': '15px', 'padding': '8px 10px', 'text-align': 'center'})
+    
+    # 텍스트가 긴 컬럼은 좌측 정렬 처리
+    left_cols = [c for c in df.columns if c in ['상품명', '방제이력', '적용병해충', '계통']]
     if left_cols: styled_df = styled_df.set_properties(subset=left_cols, **{'text-align': 'left'})
     if '금액 (원)' in df.columns: styled_df = styled_df.set_properties(subset=['금액 (원)'], **{'text-align': 'right'}).format({'금액 (원)': '{:,.0f}'}, na_rep="")
-    st.dataframe(styled_df, hide_index=True, use_container_width=True, height=210)
+    
+    st.dataframe(styled_df, hide_index=True, use_container_width=True, height=250)
 
 def render_moa_popup_trigger(df_current_result):
     if 'Kijak' not in df_current_result.columns: return
@@ -570,7 +619,7 @@ else:
                     if res.empty: st.error("찾을 수 없습니다. 다시 입력해주세요!")
                     else:
                         st.markdown("<div class='search-header-result'><h3>📑 검색 결과</h3></div>", unsafe_allow_html=True)
-                        st.success("💡 5개 이상의 결과는 표 안에서 위아래로 스크롤하여 확인하세요. 표의 열 제목을 클릭하면 정렬됩니다.")
+                        st.success("💡 5개 이상의 결과는 표 안에서 위아래로 스크롤하여 확인하세요. (동일 작용기작 방제이력이 있을 경우 빨간색으로 표시됩니다)")
                         render_styled_dataframe(res)
                         render_moa_popup_trigger(res)
             else:
@@ -591,7 +640,7 @@ else:
                         else: st.error("찾을 수 없습니다. 다시 입력해주세요!")
                     else:
                         st.markdown("<div class='search-header-result'><h3>📑 검색 결과</h3></div>", unsafe_allow_html=True)
-                        st.success("💡 5개 이상의 결과는 표 안에서 위아래로 스크롤하여 확인하세요. 표의 열 제목을 클릭하면 정렬됩니다.")
+                        st.success("💡 5개 이상의 결과는 표 안에서 위아래로 스크롤하여 확인하세요. (동일 작용기작 방제이력이 있을 경우 빨간색으로 표시됩니다)")
                         render_styled_dataframe(res)
                         render_moa_popup_trigger(res)
 
