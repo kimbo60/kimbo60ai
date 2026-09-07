@@ -1,5 +1,5 @@
 # ==========================================
-# 📌 버전: 34.4 | 수정일시: 2026.09.07
+# 📌 버전: 34.5 | 수정일시: 2026.09.07
 # 📌 주요 수정내용: 
 #    1. 모바일 UI/UX 최적화: 휴대폰 화면(너비 768px 이하) 접속 시 제목 및 메뉴 글자 크기 자동 축소 (반응형 CSS 적용)
 #    2. 메인화면 실시간 날씨 및 기상청 초단기실황 연동 유지
@@ -8,7 +8,8 @@
 #    5. 작용기작 검색 메뉴에 코드 형식 안내 이미지 추가 및 표 가운데 정렬 적용
 #    6. 병해충 분석: 정밀판독 소요시간 안내 메시지 추가 및 초기화(중단/새로고침) 버튼 구현
 #    7. 내가 필요한 농약 찾기: 다중 병해충 검색 시 AND 조건 적용 및 공통 약제 없을 시 개별 안내 추가
-#    8. [NEW] 농약 검색 결과 표 고도화: '나의 방제이력' 작용기작 연동 (이력 유무에 따른 적색/청색 표시 및 살포일자 표시 추가)
+#    8. 농약 검색 결과 표 고도화: '나의 방제이력' 작용기작 연동 (이력 유무에 따른 적색/청색 표시)
+#    9. [NEW] 방제이력 매칭 오류 수정: 빈 값(nan) 교차 검증 예외 처리 및 날짜 6자리(YYMMDD) 텍스트 포맷 적용
 # ==========================================
 
 import streamlit as st
@@ -238,25 +239,39 @@ def render_styled_dataframe(df):
     # 최신 방제이력 가져오기
     df_hist = fetch_spray_history()
     
-    # 💡 방제이력 체크 로직 (Kijak 비교)
+    # 💡 [핵심 수정] 방제이력 체크 로직 (Kijak 비교 보완 및 6자리 포맷)
     history_col = []
     for idx, row in df.iterrows():
         k = str(row.get('Kijak', '')).strip()
         
-        # 작용기작이 '가1+다3' 처럼 섞여있을 수 있으므로 분리
-        current_moas = [m.strip() for m in k.replace('/', '+').split('+') if m.strip()]
+        # 작용기작이 명확하지 않은 경우 (결측치) 제외 처리
+        if not k or k.lower() == 'nan':
+            history_col.append("없음")
+            continue
+            
+        current_moas = [m.strip() for m in k.replace('/', '+').split('+') if m.strip() and m.strip().lower() != 'nan']
         matched_dates = set()
         
         if current_moas and not df_hist.empty and 'Kijak' in df_hist.columns:
             for _, h_row in df_hist.iterrows():
-                hist_k = str(h_row.get('Kijak', ''))
-                hist_moas = [m.strip() for m in hist_k.replace('/', '+').split('+') if m.strip()]
+                hist_k = str(h_row.get('Kijak', '')).strip()
+                if not hist_k or hist_k.lower() == 'nan':
+                    continue
+                
+                hist_moas = [m.strip() for m in hist_k.replace('/', '+').split('+') if m.strip() and m.strip().lower() != 'nan']
                 
                 # 교차 검증: 하나라도 일치하는 작용기작이 과거 기록에 있는지 확인
                 if set(current_moas) & set(hist_moas):
-                    dt = str(h_row.get('Date', ''))
-                    if dt:
-                        matched_dates.add(dt)
+                    dt_str = str(h_row.get('Date', '')).strip()
+                    if dt_str and dt_str.lower() != 'nan':
+                        # 날짜를 6자리(YYMMDD)로 변환
+                        clean_dt = dt_str.replace('-', '').replace('.', '').replace('/', '')
+                        if len(clean_dt) >= 8: # YYYYMMDD 형태인 경우
+                            matched_dates.add(clean_dt[2:8])
+                        elif len(clean_dt) == 6:
+                            matched_dates.add(clean_dt)
+                        else:
+                            matched_dates.add(clean_dt) # 예외 데이터
         
         if matched_dates:
             sorted_dates = sorted(list(matched_dates), reverse=True)
@@ -264,18 +279,18 @@ def render_styled_dataframe(df):
         else:
             history_col.append("없음")
             
-    # 'History_Dates' 파생 컬럼 생성
+    # '방제이력' 파생 컬럼 생성
     df = df.copy()
-    df['History_Dates'] = history_col
+    df['방제이력'] = history_col
     
     # 출력 열 순서 지정 ('방제이력'을 '상품명' 바로 뒤에 배치)
-    display_columns = ['Type', 'Product Name', 'History_Dates', 'Kijak', 'Spec', 'Usage', 'Price', 'Byung', 'Gyetong']
+    display_columns = ['Type', 'Product Name', '방제이력', 'Kijak', 'Spec', 'Usage', 'Price', 'Byung', 'Gyetong']
     df = df[[col for col in display_columns if col in df.columns]].copy()
     
     if 'Price' in df.columns: df['Price'] = pd.to_numeric(df['Price'].astype(str).str.replace(',', ''), errors='coerce')
     
     rename_dict = {
-        'Type': '종류', 'Product Name': '상품명', 'History_Dates': '방제이력', 'Kijak': '작용기작', 
+        'Type': '종류', 'Product Name': '상품명', 'Kijak': '작용기작', 
         'Spec': '규격', 'Usage': '사용량', 'Price': '금액 (원)', 
         'Byung': '적용병해충', 'Gyetong': '계통'
     }
