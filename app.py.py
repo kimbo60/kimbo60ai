@@ -1,16 +1,14 @@
 # ==========================================
-# 📌 버전: 34.7 | 수정일시: 2026.09.07
+# 📌 버전: 34.8 | 수정일시: 2026.09.07
 # 📌 주요 수정내용: 
-#    1. 모바일 UI/UX 최적화: 휴대폰 화면(너비 768px 이하) 접속 시 제목 및 메뉴 글자 크기 자동 축소 (반응형 CSS 적용)
-#    2. 메인화면 실시간 날씨 및 기상청 초단기실황 연동 유지
-#    3. 정보교환마당: 작성자 본인 글 수정/삭제 기능 추가
-#    4. 검색 메인화면 UI 최적화 및 총살포량(말/L) 자동 계산 기능 우측 배치
-#    5. 작용기작 검색 메뉴에 코드 형식 안내 이미지 추가 및 표 가운데 정렬 적용
-#    6. 병해충 분석: 정밀판독 소요시간 안내 메시지 추가 및 초기화(중단/새로고침) 버튼 구현
-#    7. 내가 필요한 농약 찾기: 다중 병해충 검색 시 AND 조건 적용 및 공통 약제 없을 시 개별 안내 추가
-#    8. 농약 검색 결과 표 고도화: '나의 방제이력' 작용기작 연동 (이력 유무에 따른 적색/청색 표시)
-#    9. 방제이력 매칭 완벽 수정: 작용기작 부분 일치 오류 해결 -> 100% 완전 일치 시에만 6자리 날짜(YYMMDD) 표시
-#   10. [NEW] 농약 검색 결과 표 추가 고도화: '방제이력' 옆에 '방제약명' 필드 추가 및 과거 살포 약제명 표시
+#    1. 모바일 UI/UX 최적화: 휴대폰 화면 접속 시 자동 축소 (반응형 CSS)
+#    2. 메인화면 실시간 날씨 및 기상청 초단기실황 연동
+#    3. 정보교환마당: 작성자 본인 글 수정/삭제 기능
+#    4. 농약 검색 결과 표 고도화: '나의 방제이력' 작용기작 연동 (적색/청색 표시 및 방제약명 추가)
+#    5. 방제이력 매칭 오류 해결: 100% 완전 일치 시에만 6자리 날짜(YYMMDD) 표시
+#    6. [NEW] 스크롤바 두께 대폭 확대 (터치 편의성 개선)
+#    7. [NEW] 표(Dataframe) 세로 길이 대폭 확장 (한 번에 많은 목록 확인)
+#    8. [NEW] 검색 메뉴(농약명/병해충명)에 명시적인 [검색하기] 버튼 도입 및 안내 문구 추가
 # ==========================================
 
 import streamlit as st
@@ -82,10 +80,13 @@ if 'pest_uploader_key' not in st.session_state: st.session_state.pest_uploader_k
 st.markdown("""
     <style>
     a.home-link { text-decoration: none !important; }
-    ::-webkit-scrollbar { width: 18px !important; height: 18px !important; }
-    ::-webkit-scrollbar-track { background: #f1f1f1 !important; border-radius: 10px !important; box-shadow: inset 0 0 5px rgba(0,0,0,0.1) !important; }
-    ::-webkit-scrollbar-thumb { background: #ffb74d !important; border-radius: 10px !important; border: 3px solid #f1f1f1 !important; }
+    
+    /* 💡 스크롤바 두께 대폭 확대 (18px -> 24px) */
+    ::-webkit-scrollbar { width: 26px !important; height: 26px !important; }
+    ::-webkit-scrollbar-track { background: #f1f1f1 !important; border-radius: 12px !important; box-shadow: inset 0 0 5px rgba(0,0,0,0.1) !important; }
+    ::-webkit-scrollbar-thumb { background: #ffb74d !important; border-radius: 12px !important; border: 4px solid #f1f1f1 !important; }
     ::-webkit-scrollbar-thumb:hover { background: #e65100 !important; }
+    
     .hallabong-title { background-color: #e65100; padding: 15px; border-radius: 20px; text-align: center; color: white; font-weight: 900; font-size: 2.8rem; box-shadow: 0px 6px 15px rgba(230, 81, 0, 0.3); border: 3px solid #ffcc80; transition: transform 0.2s ease-in-out; margin-bottom: 10px; }
     .hallabong-title:hover { transform: scale(1.02); }
     div[data-testid="stRadio"] div[role="radiogroup"] { display: flex; flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 8px; margin-bottom: 15px; }
@@ -122,7 +123,7 @@ st.markdown("""
     .search-header-result { background: linear-gradient(to right, #e3f2fd, transparent); padding: 15px 20px; border-left: 5px solid #2196f3; border-radius: 8px; margin-bottom: 15px; }
     .search-header-result h3 { margin:0; color:#1565c0; }
 
-    /* 💡 [핵심 추가] 스마트폰 등 작은 화면(너비 768px 이하)을 위한 반응형 최적화 코드 */
+    /* 모바일 반응형 최적화 코드 */
     @media screen and (max-width: 768px) {
         .hallabong-title { 
             font-size: 1.8rem !important;  
@@ -236,23 +237,21 @@ def fetch_spray_history():
 
 df_database, df_moa_db, pesticide_list, pest_list, db_error_msg = load_data_from_supabase()
 
-def render_styled_dataframe(df):
+# 💡 표 세로 길이를 조절할 수 있도록 매개변수(grid_height) 추가
+def render_styled_dataframe(df, grid_height=500):
     df_hist = fetch_spray_history()
     
-    # 💡 [핵심 추가] '방제약명'을 담을 리스트 추가
     history_dates_col = []
     history_names_col = []
     
     for idx, row in df.iterrows():
         k = str(row.get('Kijak', '')).strip()
         
-        # 제외할 비정상 작용기작 값들
         if not k or k.lower() == 'nan' or k in ['미분류', '-', '없음', '기타', '?']:
             history_dates_col.append("없음")
             history_names_col.append("없음")
             continue
             
-        # 현재 농약의 작용기작을 분리하고 정렬하여 완전한 고유 키 생성 (예: '4a', '9b' -> '4a+9b')
         current_moas = sorted([m.strip() for m in re.split(r'[/+,]', k) if m.strip() and m.strip().lower() != 'nan'])
         current_moa_key = "+".join(current_moas)
         
@@ -262,7 +261,7 @@ def render_styled_dataframe(df):
             continue
             
         matched_dates = set()
-        matched_names = set() # 매칭된 농약명을 담을 set
+        matched_names = set()
         
         if not df_hist.empty and 'Kijak' in df_hist.columns:
             for _, h_row in df_hist.iterrows():
@@ -270,29 +269,24 @@ def render_styled_dataframe(df):
                 if not hist_k or hist_k.lower() == 'nan' or hist_k in ['미분류', '-', '없음', '기타', '?']:
                     continue
                 
-                # 과거 살포했던 농약의 작용기작도 분리 및 정렬하여 키 생성
                 hist_moas = sorted([m.strip() for m in re.split(r'[/+,]', hist_k) if m.strip() and m.strip().lower() != 'nan'])
                 hist_moa_key = "+".join(hist_moas)
                 
-                # 💡 핵심: 조합이 100% 똑같을 때만 매칭 성공으로 간주
                 if current_moa_key == hist_moa_key:
-                    # 1. 날짜 추출 및 포맷 변환
                     dt_str = str(h_row.get('Date', '')).strip()
                     if dt_str and dt_str.lower() != 'nan':
                         clean_dt = dt_str.replace('-', '').replace('.', '').replace('/', '')
-                        if len(clean_dt) >= 8: # YYYYMMDD -> YYMMDD 6자리 변환
+                        if len(clean_dt) >= 8: 
                             matched_dates.add(clean_dt[2:8])
                         elif len(clean_dt) == 6:
                             matched_dates.add(clean_dt)
                         else:
                             matched_dates.add(clean_dt)
                             
-                    # 2. 농약 이름(방제약명) 추출
                     n_name = str(h_row.get('Nongyak', '')).strip()
                     if n_name and n_name.lower() != 'nan':
                         matched_names.add(n_name)
         
-        # 매칭된 결과가 있을 경우 리스트에 정렬하여 추가
         if matched_dates:
             sorted_dates = sorted(list(matched_dates), reverse=True)
             history_dates_col.append(", ".join(sorted_dates))
@@ -303,9 +297,8 @@ def render_styled_dataframe(df):
             
     df = df.copy()
     df['방제이력'] = history_dates_col
-    df['방제약명'] = history_names_col # 새로 추가된 방제약명 컬럼
+    df['방제약명'] = history_names_col 
     
-    # 출력 열 순서 지정 ('방제약명'을 '방제이력' 바로 뒤에 배치)
     display_columns = ['Type', 'Product Name', '방제이력', '방제약명', 'Kijak', 'Spec', 'Usage', 'Price', 'Byung', 'Gyetong']
     df = df[[col for col in display_columns if col in df.columns]].copy()
     
@@ -320,19 +313,19 @@ def render_styled_dataframe(df):
     
     def color_rows(row):
         if row.get('방제이력', '없음') != '없음':
-            return ['color: #d32f2f; font-weight: 600;'] * len(row) # 빨간색
+            return ['color: #d32f2f; font-weight: 600;'] * len(row) 
         else:
-            return ['color: #1976d2; font-weight: 600;'] * len(row) # 파란색
+            return ['color: #1976d2; font-weight: 600;'] * len(row) 
 
     styled_df = df.style.apply(color_rows, axis=1)
     styled_df = styled_df.set_properties(**{'font-size': '15px', 'padding': '8px 10px', 'text-align': 'center'})
     
-    # 텍스트가 긴 컬럼은 좌측 정렬 처리 (방제약명 추가)
     left_cols = [c for c in df.columns if c in ['상품명', '방제이력', '방제약명', '적용병해충', '계통']]
     if left_cols: styled_df = styled_df.set_properties(subset=left_cols, **{'text-align': 'left'})
     if '금액 (원)' in df.columns: styled_df = styled_df.set_properties(subset=['금액 (원)'], **{'text-align': 'right'}).format({'금액 (원)': '{:,.0f}'}, na_rep="")
     
-    st.dataframe(styled_df, hide_index=True, use_container_width=True, height=250)
+    # 세로 높이 변수(grid_height) 적용
+    st.dataframe(styled_df, hide_index=True, use_container_width=True, height=grid_height)
 
 def render_moa_popup_trigger(df_current_result):
     if 'Kijak' not in df_current_result.columns: return
@@ -601,7 +594,7 @@ else:
                         else:
                             st.markdown("<p style='color:red; font-size:15px; margin-top:8px; padding-left:10px;'>⚠️ 숫자만 입력해주세요.</p>", unsafe_allow_html=True)
 
-                submitted = st.form_submit_button("🔎 조건에 맞는 농약 찾기")
+                submitted = st.form_submit_button("🔎 검색하기")
 
             if submitted:
                 if not desired_pesticide and not target_pest: 
@@ -636,7 +629,7 @@ else:
                         st.success(f"✅ 총 {len(filtered_df)}개의 약제가 검색되었습니다.")
 
             if 'df_result' in st.session_state and not st.session_state.df_result.empty:
-                render_styled_dataframe(st.session_state.df_result)
+                render_styled_dataframe(st.session_state.df_result, grid_height=500)
                 render_moa_popup_trigger(st.session_state.df_result)
         with col_img: render_weather_section()
 
@@ -648,37 +641,59 @@ else:
         with col_center:
             if menu == "농약명으로 찾기":
                 st.markdown("<div class='search-header-pest'><h3>🔍 농약명 검색</h3></div>", unsafe_allow_html=True)
-                search_val = st.selectbox("농약 상품명 선택/입력:", options=pesticide_list, index=None, placeholder="찾으시는 농약명을 검색하세요", label_visibility="collapsed")
+                
+                # 💡 [핵심] 검색하기 버튼 추가 (UX 명확화)
+                with st.form("nongyak_search_form"):
+                    search_val = st.selectbox("농약 상품명 선택/입력:", options=pesticide_list, index=None, placeholder="찾으시는 농약명을 검색하세요", label_visibility="collapsed")
+                    st.markdown("<p style='font-size:14px; color:gray; margin-top:5px; margin-bottom:0;'>💡 농약명을 선택한 후 아래 검색 버튼을 눌러주세요.</p>", unsafe_allow_html=True)
+                    submit_nongyak = st.form_submit_button("🔎 검색하기")
+                
                 st.markdown("<hr style='border: 1px dashed #cccccc; margin: 30px 0;'>", unsafe_allow_html=True)
-                if search_val and search_val.strip():
-                    res = df_database[df_database['Product Name'].astype(str) == search_val]
-                    if res.empty: st.error("찾을 수 없습니다. 다시 입력해주세요!")
+                
+                if submit_nongyak:
+                    if search_val and search_val.strip():
+                        res = df_database[df_database['Product Name'].astype(str) == search_val]
+                        if res.empty: st.error("찾을 수 없습니다. 다시 입력해주세요!")
+                        else:
+                            st.markdown("<div class='search-header-result'><h3>📑 검색 결과</h3></div>", unsafe_allow_html=True)
+                            st.success("💡 표 안에서 좌우/위아래로 스크롤하여 확인하세요. (동일 작용기작 방제이력이 있을 경우 빨간색으로 표시됩니다)")
+                            render_styled_dataframe(res, grid_height=350)
+                            render_moa_popup_trigger(res)
                     else:
-                        st.markdown("<div class='search-header-result'><h3>📑 검색 결과</h3></div>", unsafe_allow_html=True)
-                        st.success("💡 5개 이상의 결과는 표 안에서 위아래로 스크롤하여 확인하세요. (동일 작용기작 방제이력이 있을 경우 빨간색으로 표시됩니다)")
-                        render_styled_dataframe(res)
-                        render_moa_popup_trigger(res)
+                        st.warning("⚠️ 검색할 농약명을 먼저 선택해주세요.")
+                        
             else:
                 st.markdown("<div class='search-header-bug'><h3>🐛 병해충명 검색 (최대 3개 입력 가능)</h3></div>", unsafe_allow_html=True)
-                search_vals = st.multiselect("병해충명 선택/입력:", options=pest_list, placeholder="찾으시는 병해충명을 검색하세요 (최대 3개)", max_selections=3, label_visibility="collapsed")
+                
+                # 💡 [핵심] 검색하기 버튼 추가 (UX 명확화)
+                with st.form("pest_search_form"):
+                    search_vals = st.multiselect("병해충명 선택/입력:", options=pest_list, placeholder="찾으시는 병해충명을 검색하세요 (최대 3개)", max_selections=3, label_visibility="collapsed")
+                    st.markdown("<p style='font-size:14px; color:gray; margin-top:5px; margin-bottom:0;'>💡 병해충명을 선택/입력(엔터)한 후 아래 검색 버튼을 눌러주세요.</p>", unsafe_allow_html=True)
+                    submit_pest = st.form_submit_button("🔎 검색하기")
+                
                 st.markdown("<hr style='border: 1px dashed #cccccc; margin: 30px 0;'>", unsafe_allow_html=True)
-                if search_vals:
-                    res = df_database.copy()
-                    for val in search_vals: res = res[res['Byung'].astype(str).str.contains(val)]
-                    if res.empty:
-                        if len(search_vals) > 1:
-                            st.error("🚨 입력조건을 모두 만족하는 농약은 없습니다.")
-                            st.markdown("#### 💡 각 병해충 조건별 적용 가능한 농약")
-                            for val in search_vals:
-                                individual_res = df_database[df_database['Byung'].astype(str).str.contains(val)]
-                                if not individual_res.empty: st.info(f"**[{val}]** : {', '.join(individual_res['Product Name'].unique().tolist())}")
-                                else: st.warning(f"**[{val}]** : 등록된 농약이 없습니다.")
-                        else: st.error("찾을 수 없습니다. 다시 입력해주세요!")
+                
+                if submit_pest:
+                    if search_vals:
+                        res = df_database.copy()
+                        for val in search_vals: res = res[res['Byung'].astype(str).str.contains(val)]
+                        if res.empty:
+                            if len(search_vals) > 1:
+                                st.error("🚨 입력조건을 모두 만족하는 농약은 없습니다.")
+                                st.markdown("#### 💡 각 병해충 조건별 적용 가능한 농약")
+                                for val in search_vals:
+                                    individual_res = df_database[df_database['Byung'].astype(str).str.contains(val)]
+                                    if not individual_res.empty: st.info(f"**[{val}]** : {', '.join(individual_res['Product Name'].unique().tolist())}")
+                                    else: st.warning(f"**[{val}]** : 등록된 농약이 없습니다.")
+                            else: st.error("찾을 수 없습니다. 다시 입력해주세요!")
+                        else:
+                            st.markdown("<div class='search-header-result'><h3>📑 검색 결과</h3></div>", unsafe_allow_html=True)
+                            st.success("💡 결과가 많을 수 있습니다. 표 안에서 좌우/위아래로 스크롤하여 확인하세요. (동일 작용기작 방제이력이 있을 경우 빨간색으로 표시됩니다)")
+                            # 병해충 검색 결과는 많을 수 있으므로 높이를 500으로 설정
+                            render_styled_dataframe(res, grid_height=500)
+                            render_moa_popup_trigger(res)
                     else:
-                        st.markdown("<div class='search-header-result'><h3>📑 검색 결과</h3></div>", unsafe_allow_html=True)
-                        st.success("💡 5개 이상의 결과는 표 안에서 위아래로 스크롤하여 확인하세요. (동일 작용기작 방제이력이 있을 경우 빨간색으로 표시됩니다)")
-                        render_styled_dataframe(res)
-                        render_moa_popup_trigger(res)
+                        st.warning("⚠️ 검색할 병해충명을 하나 이상 선택해주세요.")
 
     # ----------------------------------------
     # 메뉴 4: 작용기작 검색
@@ -755,7 +770,9 @@ else:
             if '수량' in display_history.columns: format_dict['수량'] = '{:.0f}'
             if '총살포량(L)' in display_history.columns: format_dict['총살포량(L)'] = '{:.0f}'
             if format_dict: styled_history = styled_history.format(format_dict, na_rep="")
-            st.dataframe(styled_history, hide_index=True)
+            
+            # 방제이력 표 길이도 넉넉하게 지정
+            st.dataframe(styled_history, hide_index=True, height=500)
             
         st.markdown("<br>", unsafe_allow_html=True)
         
