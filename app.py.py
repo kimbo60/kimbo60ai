@@ -1,15 +1,14 @@
 # ==========================================
-# 📌 버전: 34.11 | 수정일시: 2026.09.08
+# 📌 버전: 34.12 | 수정일시: 2026.09.08
 # 📌 주요 수정내용: 
-#    1. 모바일 UI/UX 최적화 (반응형 CSS 적용)
-#    2. 메인화면 실시간 날씨 및 기상청 초단기실황 연동
+#    1. 모바일 UI/UX 최적화 (반응형 CSS, 8개 메뉴 2줄 래핑 허용)
+#    2. 메인화면 로그인 영역 제목 아랫줄 정렬 및 비회원 버튼 색상 차별화
 #    3. 농약 검색 결과 표 고도화 (방제이력 100% 매칭, 적색/청색 표시 및 방제약명 표시)
-#    4. 스크롤바 두께 초대형 확대 (36px)로 터치 편의성 극대화
-#    5. '나의 영농일지' 메뉴 신설 및 카테고리(적과, 수확) 추가, 다중 사진 업로드 구현
-#    6. 비회원/로그인 메뉴 차별화 (블루그레이 색상 적용)
-#    7. [NEW] 메인 메뉴 반응형 2줄 자동 줄바꿈 허용 (모바일 스크롤 불편 해소)
-#    8. [NEW] 헤더 영역 "로그인/비회원" 버튼을 타이틀 아래쪽 기준선으로 정렬 맞춤
-#    9. [NEW] 병해충 분석 정밀판독 안내 문구를 "약 1~2분"으로 수정
+#    4. 스크롤바 두께 초대형 확대 (36px) 및 표 세로 길이 확보
+#    5. AI 정밀판독 소요 시간 안내 문구 변경 ("약 1~2분")
+#    6. [NEW] 나의 영농일지 UI 전면 개편 (입력폼 상단 배치, 목록 스크롤 컨테이너 적용)
+#    7. [NEW] 나의 영농일지 폰트 크기 축소 및 날짜 최신순(역순) 정렬 적용
+#    8. [NEW] 영농일지 DB 저장 오류(WorkID Integer Overflow) 완벽 해결
 # ==========================================
 
 import streamlit as st
@@ -70,7 +69,7 @@ except Exception as e:
 if 'list_count' not in st.session_state: st.session_state.list_count = 5
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 if 'current_user' not in st.session_state: st.session_state.current_user = {}
-if 'active_menu' not in st.session_state: st.session_state.active_menu = "내가 필요한 농약 찾기"
+if 'active_menu' not in st.session_state: st.session_state.active_menu = "나의 영농일지"
 if 'form_reset_key' not in st.session_state: st.session_state.form_reset_key = 0
 if 'edit_post_id' not in st.session_state: st.session_state.edit_post_id = None
 if 'pest_uploader_key' not in st.session_state: st.session_state.pest_uploader_key = 0 
@@ -96,7 +95,7 @@ st.markdown("""
     div[data-testid="stRadio"] div[role="radiogroup"] { display: flex; flex-direction: row; gap: 8px; }
     div[data-testid="stRadio"] div[role="radiogroup"] label { margin: 0 !important; cursor: pointer; transition: all 0.1s ease-in-out; }
 
-    /* 💡 로그인/비회원 메뉴 (옵션 2개짜리) - 회색톤 & 최소 크기 */
+    /* 로그인/비회원 메뉴 (옵션 2개짜리) - 회색톤 & 최소 크기 */
     div[data-testid="stRadio"]:has(label:nth-child(2)):not(:has(label:nth-child(3))) div[role="radiogroup"] { 
         justify-content: flex-end; gap: 5px; 
     }
@@ -114,10 +113,10 @@ st.markdown("""
         background: linear-gradient(145deg, #cfd8dc, #b0bec5) !important; transform: translateY(2px) !important; 
     }
 
-    /* 💡 [핵심] 8개 메인 메뉴 - 공간 부족 시 자동으로 2줄로 넘어가도록 wrap 적용 */
+    /* 8개 메인 메뉴 - 공간 부족 시 자동으로 2줄로 넘어가도록 wrap 적용 */
     div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] { 
         justify-content: center; 
-        flex-wrap: wrap !important; /* 1줄 고정 해제 -> 2줄 허용 */
+        flex-wrap: wrap !important; 
         padding-bottom: 5px; margin-bottom: 15px; 
     }
     div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label { 
@@ -171,7 +170,7 @@ st.markdown("""
         .hallabong-title img { width: 45px !important; margin-right: 10px !important; }
         div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label p { font-size: 12.5px !important; }
         .card-weather { font-size: 1.05rem !important; }
-        .login-spacer { height: 5px !important; } /* 모바일에서는 로그인 여백 축소 */
+        .login-spacer { height: 5px !important; } 
     }
     </style>
 """, unsafe_allow_html=True)
@@ -525,7 +524,6 @@ with col_logo:
     icon_tag = f'<img src="{icon_base64}" width="60" style="vertical-align: middle; margin-right: 15px; filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.3));">' if icon_base64 else '🍊'
     st.markdown(f"<a href='/' target='_self' class='home-link'><div class='hallabong-title'>{icon_tag} 내가 찾는 농약</div></a>", unsafe_allow_html=True)
 with col_login:
-    # 💡 [핵심] 로그인/비회원 버튼이 타이틀과 아래쪽 정렬 되도록 동적 여백 추가
     st.markdown("<div style='height: 40px;' class='login-spacer'></div>", unsafe_allow_html=True)
     if st.session_state.logged_in:
         st.markdown(f"<div style='text-align: right; font-size: 16px; margin-bottom: 5px;'><b>{st.session_state.current_user.get('name')}</b>님 환영합니다!</div>", unsafe_allow_html=True)
@@ -887,60 +885,13 @@ else:
             st.markdown("</div>", unsafe_allow_html=True)
 
     # ----------------------------------------
-    # 메뉴 5.1: 나의 영농일지
+    # 메뉴 5.1: 나의 영농일지 (NEW - 전면 개편)
     # ----------------------------------------
     elif menu == "나의 영농일지":
         st.subheader("📓 나의 영농일지")
         
-        df_ilji = pd.DataFrame()
-        if supabase_connected:
-            try:
-                res_ilji = supabase.table("DB_Myilji").select("*").order("Nalja", desc=True).execute()
-                df_ilji = pd.DataFrame(res_ilji.data)
-            except Exception as e:
-                st.warning("⚠️ 영농일지 DB(DB_Myilji)가 아직 생성되지 않았거나 연결 오류가 발생했습니다.")
-        
-        if not df_ilji.empty:
-            for _, row in df_ilji.iterrows():
-                w_id = row.get("WorkID")
-                d_date = row.get("Nalja", "")
-                cat = row.get("Category", "")
-                work_content = row.get("Work", "")
-                remark = row.get("Remark", "")
-                user_id = row.get("UserID", "")
-                
-                img_urls = []
-                try:
-                    res_img = supabase.table("DB_Image").select("ImageURL").eq("RefID", str(w_id)).eq("Category", "Myilji").execute()
-                    img_urls = [img['ImageURL'] for img in res_img.data]
-                except:
-                    pass
-                
-                with st.container():
-                    st.markdown(f"""
-                    <div style='background-color:#f8fbfa; padding:15px; border-radius:10px; margin-bottom:10px; border-left:5px solid #2e7d32; box-shadow: 0px 2px 5px rgba(0,0,0,0.05);'>
-                        <div style='display:flex; justify-content:space-between;'>
-                            <p style='margin:0; font-size:14px; color:gray;'>📅 <b>{d_date}</b></p>
-                            <p style='margin:0; font-size:12px; color:gray;'>👤 {user_id}</p>
-                        </div>
-                        <h4 style='margin:8px 0; color:#1565c0;'>[{cat}]</h4>
-                        <p style='margin:5px 0; font-size:16px; line-height:1.5;'>{work_content}</p>
-                        {f"<p style='margin:5px 0 0 0; font-size:13px; color:#e65100;'>* 참고: {remark}</p>" if remark else ""}
-                    </div>
-                    """, unsafe_allow_html=True)
-                    
-                    if img_urls:
-                        cols = st.columns(min(len(img_urls), 5))
-                        for i, url in enumerate(img_urls[:5]): 
-                            with cols[i]:
-                                st.image(url, use_container_width=True)
-                    st.markdown("<hr style='margin:15px 0; border-top: 1px dashed #cccccc;'>", unsafe_allow_html=True)
-        else:
-            st.info("등록된 영농일지가 없습니다. 아래에서 첫 번째 일지를 작성해 보세요!")
-            
-        st.markdown("<br>", unsafe_allow_html=True)
-        
-        with st.expander("➕ 새로운 영농일지 작성", expanded=False):
+        # 1. 상단: 새로운 영농일지 작성 영역 (가장 먼저 보이도록 배치)
+        with st.expander("➕ 새로운 영농일지 작성 (이곳을 클릭하여 작성하세요)", expanded=True):
             with st.form("myilji_form", clear_on_submit=True):
                 col1, col2 = st.columns(2)
                 with col1:
@@ -959,7 +910,8 @@ else:
                     if not i_work:
                         st.warning("작업 내용을 입력해 주세요.")
                     else:
-                        work_id = int(datetime.now().strftime("%y%m%d%H%M%S"))
+                        # 💡 [핵심 버그 수정] WorkID를 일반 Int 규격(21억 이하)인 Unix Timestamp로 생성하여 Overflow 방지
+                        work_id = int(time.time())
                         current_uid = st.session_state.current_user.get('id', 'guest') if st.session_state.logged_in else 'guest'
                         
                         ilji_data = {
@@ -974,6 +926,7 @@ else:
                         try:
                             supabase.table("DB_Myilji").insert(ilji_data).execute()
                             
+                            # 이미지 업로드 처리
                             if i_files:
                                 img_data_list = []
                                 for idx, f in enumerate(i_files):
@@ -984,7 +937,7 @@ else:
                                         pub_url = supabase.storage.from_("farm_images").get_public_url(file_name)
                                         
                                         img_data_list.append({
-                                            "ImageID": int(datetime.now().strftime("%y%m%d%H%M%S")) + idx,
+                                            "ImageID": int(time.time()) + idx + 1,
                                             "Category": "Myilji",
                                             "RefID": str(work_id),
                                             "ImageURL": pub_url,
@@ -1001,7 +954,62 @@ else:
                             st.rerun()
                             
                         except Exception as e:
-                            st.error(f"🚨 저장 중 오류가 발생했습니다. DB 테이블 생성을 확인해주세요: {e}")
+                            st.error(f"🚨 DB 저장 중 오류가 발생했습니다. (DB_Myilji 테이블이 없거나 컬럼 설정이 잘못되었을 수 있습니다): {e}")
+
+        # 2. 하단: 기존 영농일지 목록 (스크롤 및 글자크기 축소 반영)
+        st.markdown("<hr style='margin:20px 0;'>", unsafe_allow_html=True)
+        st.markdown("#### 📖 나의 영농일지 기록")
+        
+        df_ilji = pd.DataFrame()
+        if supabase_connected:
+            try:
+                # 날짜 기준 내림차순(최신순) 정렬 적용
+                res_ilji = supabase.table("DB_Myilji").select("*").order("Nalja", desc=True).order("WorkID", desc=True).execute()
+                df_ilji = pd.DataFrame(res_ilji.data)
+            except Exception as e:
+                st.warning("⚠️ 영농일지 DB(DB_Myilji) 데이터를 불러오는 중 오류가 발생했습니다.")
+        
+        # 💡 [핵심] 스크롤 컨테이너 적용
+        list_container = st.container(height=600)
+        
+        with list_container:
+            if not df_ilji.empty:
+                for _, row in df_ilji.iterrows():
+                    w_id = row.get("WorkID")
+                    d_date = row.get("Nalja", "")
+                    cat = row.get("Category", "")
+                    work_content = row.get("Work", "")
+                    remark = row.get("Remark", "")
+                    user_id = row.get("UserID", "")
+                    
+                    img_urls = []
+                    try:
+                        res_img = supabase.table("DB_Image").select("ImageURL").eq("RefID", str(w_id)).eq("Category", "Myilji").execute()
+                        img_urls = [img['ImageURL'] for img in res_img.data]
+                    except:
+                        pass
+                    
+                    # 글자 크기를 줄인 HTML 구조 적용
+                    st.markdown(f"""
+                    <div style='background-color:#f8fbfa; padding:12px; border-radius:10px; margin-bottom:10px; border-left:5px solid #2e7d32; box-shadow: 0px 2px 5px rgba(0,0,0,0.05);'>
+                        <div style='display:flex; justify-content:space-between; margin-bottom:4px;'>
+                            <p style='margin:0; font-size:13px; color:gray;'>📅 <b>{d_date}</b></p>
+                            <p style='margin:0; font-size:11px; color:gray;'>👤 {user_id}</p>
+                        </div>
+                        <div style='font-size:13px; font-weight:bold; color:#1565c0; margin-bottom:5px;'>[{cat}]</div>
+                        <div style='font-size:14px; line-height:1.4; color:#333; margin-bottom:5px;'>{work_content}</div>
+                        {f"<div style='font-size:12px; color:#e65100; margin-top:5px;'>* 참고: {remark}</div>" if remark else ""}
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    if img_urls:
+                        cols = st.columns(min(len(img_urls), 5))
+                        for i, url in enumerate(img_urls[:5]): 
+                            with cols[i]:
+                                st.image(url, use_container_width=True)
+                    st.markdown("<hr style='margin:10px 0; border-top: 1px dashed #cccccc;'>", unsafe_allow_html=True)
+            else:
+                st.info("등록된 영농일지가 없습니다.")
 
     # ----------------------------------------
     # 메뉴 6: 병해충 분석
@@ -1035,6 +1043,7 @@ else:
             
             st.markdown("<br>", unsafe_allow_html=True)
             
+            # 💡 [문구 변경] 약 1~2분으로 변경
             st.markdown("<p style='color: #e65100; font-size: 15px; font-weight: bold; margin-bottom: 10px;'>💡 안내: 정밀판독에 약 1~2분 정도의 시간이 소요될 수 있습니다.</p>", unsafe_allow_html=True)
             
             col_start, col_reset = st.columns([7, 3])
