@@ -1,14 +1,12 @@
 # ==========================================
-# 📌 버전: 34.8 | 수정일시: 2026.09.07
+# 📌 버전: 34.9 | 수정일시: 2026.09.08
 # 📌 주요 수정내용: 
-#    1. 모바일 UI/UX 최적화: 휴대폰 화면 접속 시 자동 축소 (반응형 CSS)
+#    1. 모바일 UI/UX 최적화 (반응형 CSS 적용)
 #    2. 메인화면 실시간 날씨 및 기상청 초단기실황 연동
-#    3. 정보교환마당: 작성자 본인 글 수정/삭제 기능
-#    4. 농약 검색 결과 표 고도화: '나의 방제이력' 작용기작 연동 (적색/청색 표시 및 방제약명 추가)
-#    5. 방제이력 매칭 오류 해결: 100% 완전 일치 시에만 6자리 날짜(YYMMDD) 표시
-#    6. [NEW] 스크롤바 두께 대폭 확대 (터치 편의성 개선)
-#    7. [NEW] 표(Dataframe) 세로 길이 대폭 확장 (한 번에 많은 목록 확인)
-#    8. [NEW] 검색 메뉴(농약명/병해충명)에 명시적인 [검색하기] 버튼 도입 및 안내 문구 추가
+#    3. 농약 검색 결과 표 고도화: '나의 방제이력' 완벽 매칭 (적색/청색 표시 및 방제약명 표시)
+#    4. [NEW] 스크롤바 두께 초대형 확대 (26px -> 36px)로 터치 편의성 극대화
+#    5. [NEW] '나의 영농일지' 메뉴 신설 (DB_Myilji 및 DB_Image 연동 다중 사진 업로드 구현)
+#    6. [NEW] 영농일지 카테고리에 '적과', '수확' 추가
 # ==========================================
 
 import streamlit as st
@@ -75,16 +73,16 @@ if 'edit_post_id' not in st.session_state: st.session_state.edit_post_id = None
 if 'pest_uploader_key' not in st.session_state: st.session_state.pest_uploader_key = 0 
 
 # ==========================================
-# 🎨 UI 디자인 (CSS 스타일) - 모바일 반응형 추가
+# 🎨 UI 디자인 (CSS 스타일)
 # ==========================================
 st.markdown("""
     <style>
     a.home-link { text-decoration: none !important; }
     
-    /* 💡 스크롤바 두께 대폭 확대 (18px -> 24px) */
-    ::-webkit-scrollbar { width: 26px !important; height: 26px !important; }
-    ::-webkit-scrollbar-track { background: #f1f1f1 !important; border-radius: 12px !important; box-shadow: inset 0 0 5px rgba(0,0,0,0.1) !important; }
-    ::-webkit-scrollbar-thumb { background: #ffb74d !important; border-radius: 12px !important; border: 4px solid #f1f1f1 !important; }
+    /* 💡 [핵심] 스크롤바 두께 초대형 확대 (36px)로 터치/마우스 조작 최적화 */
+    ::-webkit-scrollbar { width: 36px !important; height: 36px !important; }
+    ::-webkit-scrollbar-track { background: #f1f1f1 !important; border-radius: 18px !important; box-shadow: inset 0 0 5px rgba(0,0,0,0.1) !important; }
+    ::-webkit-scrollbar-thumb { background: #ffb74d !important; border-radius: 18px !important; border: 6px solid #f1f1f1 !important; }
     ::-webkit-scrollbar-thumb:hover { background: #e65100 !important; }
     
     .hallabong-title { background-color: #e65100; padding: 15px; border-radius: 20px; text-align: center; color: white; font-weight: 900; font-size: 2.8rem; box-shadow: 0px 6px 15px rgba(230, 81, 0, 0.3); border: 3px solid #ffcc80; transition: transform 0.2s ease-in-out; margin-bottom: 10px; }
@@ -237,7 +235,6 @@ def fetch_spray_history():
 
 df_database, df_moa_db, pesticide_list, pest_list, db_error_msg = load_data_from_supabase()
 
-# 💡 표 세로 길이를 조절할 수 있도록 매개변수(grid_height) 추가
 def render_styled_dataframe(df, grid_height=500):
     df_hist = fetch_spray_history()
     
@@ -324,7 +321,6 @@ def render_styled_dataframe(df, grid_height=500):
     if left_cols: styled_df = styled_df.set_properties(subset=left_cols, **{'text-align': 'left'})
     if '금액 (원)' in df.columns: styled_df = styled_df.set_properties(subset=['금액 (원)'], **{'text-align': 'right'}).format({'금액 (원)': '{:,.0f}'}, na_rep="")
     
-    # 세로 높이 변수(grid_height) 적용
     st.dataframe(styled_df, hide_index=True, use_container_width=True, height=grid_height)
 
 def render_moa_popup_trigger(df_current_result):
@@ -546,7 +542,7 @@ else:
                 st.rerun()
         st.stop()
 
-    menus = ["내가 필요한 농약 찾기", "농약명으로 찾기", "병해충명으로 찾기", "작용기작 찾기", "나의 방제이력", "병해충 분석", "정보교환마당"]
+    menus = ["내가 필요한 농약 찾기", "농약명으로 찾기", "병해충명으로 찾기", "작용기작 찾기", "나의 방제이력", "나의 영농일지", "병해충 분석", "정보교환마당"]
     menu_idx = menus.index(st.session_state.active_menu) if st.session_state.active_menu in menus else 0
     selected_menu = st.radio("메인 메뉴", menus, index=menu_idx, horizontal=True, label_visibility="collapsed")
     
@@ -594,9 +590,9 @@ else:
                         else:
                             st.markdown("<p style='color:red; font-size:15px; margin-top:8px; padding-left:10px;'>⚠️ 숫자만 입력해주세요.</p>", unsafe_allow_html=True)
 
-                submitted = st.form_submit_button("🔎 검색하기")
+                submit_btn = st.form_submit_button("🔎 검색하기")
 
-            if submitted:
+            if submit_btn:
                 if not desired_pesticide and not target_pest: 
                     st.error("⚠️ 희망 약제명 또는 발생 병해충을 하나 이상 검색/선택해 주세요.")
                     st.session_state.df_result = pd.DataFrame()
@@ -641,8 +637,6 @@ else:
         with col_center:
             if menu == "농약명으로 찾기":
                 st.markdown("<div class='search-header-pest'><h3>🔍 농약명 검색</h3></div>", unsafe_allow_html=True)
-                
-                # 💡 [핵심] 검색하기 버튼 추가 (UX 명확화)
                 with st.form("nongyak_search_form"):
                     search_val = st.selectbox("농약 상품명 선택/입력:", options=pesticide_list, index=None, placeholder="찾으시는 농약명을 검색하세요", label_visibility="collapsed")
                     st.markdown("<p style='font-size:14px; color:gray; margin-top:5px; margin-bottom:0;'>💡 농약명을 선택한 후 아래 검색 버튼을 눌러주세요.</p>", unsafe_allow_html=True)
@@ -664,8 +658,6 @@ else:
                         
             else:
                 st.markdown("<div class='search-header-bug'><h3>🐛 병해충명 검색 (최대 3개 입력 가능)</h3></div>", unsafe_allow_html=True)
-                
-                # 💡 [핵심] 검색하기 버튼 추가 (UX 명확화)
                 with st.form("pest_search_form"):
                     search_vals = st.multiselect("병해충명 선택/입력:", options=pest_list, placeholder="찾으시는 병해충명을 검색하세요 (최대 3개)", max_selections=3, label_visibility="collapsed")
                     st.markdown("<p style='font-size:14px; color:gray; margin-top:5px; margin-bottom:0;'>💡 병해충명을 선택/입력(엔터)한 후 아래 검색 버튼을 눌러주세요.</p>", unsafe_allow_html=True)
@@ -689,7 +681,6 @@ else:
                         else:
                             st.markdown("<div class='search-header-result'><h3>📑 검색 결과</h3></div>", unsafe_allow_html=True)
                             st.success("💡 결과가 많을 수 있습니다. 표 안에서 좌우/위아래로 스크롤하여 확인하세요. (동일 작용기작 방제이력이 있을 경우 빨간색으로 표시됩니다)")
-                            # 병해충 검색 결과는 많을 수 있으므로 높이를 500으로 설정
                             render_styled_dataframe(res, grid_height=500)
                             render_moa_popup_trigger(res)
                     else:
@@ -771,7 +762,6 @@ else:
             if '총살포량(L)' in display_history.columns: format_dict['총살포량(L)'] = '{:.0f}'
             if format_dict: styled_history = styled_history.format(format_dict, na_rep="")
             
-            # 방제이력 표 길이도 넉넉하게 지정
             st.dataframe(styled_history, hide_index=True, height=500)
             
         st.markdown("<br>", unsafe_allow_html=True)
@@ -864,6 +854,130 @@ else:
                     except Exception as e:
                         st.error(f"🚨 저장 중 오류가 발생했습니다: {e}")
             st.markdown("</div>", unsafe_allow_html=True)
+
+    # ----------------------------------------
+    # 메뉴 5.1: 나의 영농일지 (NEW)
+    # ----------------------------------------
+    elif menu == "나의 영농일지":
+        st.subheader("📓 나의 영농일지")
+        
+        # 1. 기존 영농일지 목록 불러오기
+        df_ilji = pd.DataFrame()
+        if supabase_connected:
+            try:
+                res_ilji = supabase.table("DB_Myilji").select("*").order("Nalja", desc=True).execute()
+                df_ilji = pd.DataFrame(res_ilji.data)
+            except Exception as e:
+                st.warning("⚠️ 영농일지 DB(DB_Myilji)가 아직 생성되지 않았거나 연결 오류가 발생했습니다.")
+        
+        if not df_ilji.empty:
+            for _, row in df_ilji.iterrows():
+                w_id = row.get("WorkID")
+                d_date = row.get("Nalja", "")
+                cat = row.get("Category", "")
+                work_content = row.get("Work", "")
+                remark = row.get("Remark", "")
+                user_id = row.get("UserID", "")
+                
+                # DB_Image 연동하여 해당 일지의 사진 가져오기
+                img_urls = []
+                try:
+                    res_img = supabase.table("DB_Image").select("ImageURL").eq("RefID", str(w_id)).eq("Category", "Myilji").execute()
+                    img_urls = [img['ImageURL'] for img in res_img.data]
+                except:
+                    pass
+                
+                with st.container():
+                    st.markdown(f"""
+                    <div style='background-color:#f8fbfa; padding:15px; border-radius:10px; margin-bottom:10px; border-left:5px solid #2e7d32; box-shadow: 0px 2px 5px rgba(0,0,0,0.05);'>
+                        <div style='display:flex; justify-content:space-between;'>
+                            <p style='margin:0; font-size:14px; color:gray;'>📅 <b>{d_date}</b></p>
+                            <p style='margin:0; font-size:12px; color:gray;'>👤 {user_id}</p>
+                        </div>
+                        <h4 style='margin:8px 0; color:#1565c0;'>[{cat}]</h4>
+                        <p style='margin:5px 0; font-size:16px; line-height:1.5;'>{work_content}</p>
+                        {f"<p style='margin:5px 0 0 0; font-size:13px; color:#e65100;'>* 참고: {remark}</p>" if remark else ""}
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    if img_urls:
+                        cols = st.columns(min(len(img_urls), 5))
+                        for i, url in enumerate(img_urls[:5]): # 최대 5장 표시
+                            with cols[i]:
+                                st.image(url, use_container_width=True)
+                    st.markdown("<hr style='margin:15px 0; border-top: 1px dashed #cccccc;'>", unsafe_allow_html=True)
+        else:
+            st.info("등록된 영농일지가 없습니다. 아래에서 첫 번째 일지를 작성해 보세요!")
+            
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        # 2. 새로운 영농일지 작성 폼
+        with st.expander("➕ 새로운 영농일지 작성", expanded=False):
+            with st.form("myilji_form", clear_on_submit=True):
+                col1, col2 = st.columns(2)
+                with col1:
+                    i_date = st.date_input("📅 일자", value=date.today())
+                with col2:
+                    # 💡 카테고리에 적과, 수확 추가
+                    i_cat = st.selectbox("분류 (작업 종류)", ["농약", "제초", "급수", "시비", "전정", "적과", "수확", "기타"])
+                
+                i_work = st.text_area("작업 내용", placeholder="오늘 진행한 작업 내용이나 나무의 상태 등을 자유롭게 적어주세요.")
+                i_remark = st.text_input("기타 참고 사항", placeholder="날씨, 온도 등 참고할 만한 특이사항")
+                
+                i_files = st.file_uploader("📸 사진 첨부 (여러 장 가능)", type=["png", "jpg", "jpeg"], accept_multiple_files=True)
+                
+                submit_ilji = st.form_submit_button("💾 영농일지 저장", type="primary")
+                
+                if submit_ilji:
+                    if not i_work:
+                        st.warning("작업 내용을 입력해 주세요.")
+                    else:
+                        work_id = int(datetime.now().strftime("%y%m%d%H%M%S"))
+                        current_uid = st.session_state.current_user.get('id', 'guest') if st.session_state.logged_in else 'guest'
+                        
+                        # DB_Myilji 저장 데이터
+                        ilji_data = {
+                            "WorkID": work_id,
+                            "UserID": current_uid,
+                            "Nalja": str(i_date),
+                            "Category": i_cat,
+                            "Work": i_work,
+                            "Remark": i_remark
+                        }
+                        
+                        try:
+                            supabase.table("DB_Myilji").insert(ilji_data).execute()
+                            
+                            # DB_Image 저장 및 Supabase Storage 업로드 로직
+                            if i_files:
+                                img_data_list = []
+                                for idx, f in enumerate(i_files):
+                                    file_ext = f.name.split('.')[-1]
+                                    file_name = f"myilji/{work_id}_{idx}.{file_ext}"
+                                    try:
+                                        # 'farm_images'라는 이름의 버킷이 Supabase Storage에 생성되어 있어야 정상 작동합니다.
+                                        supabase.storage.from_("farm_images").upload(file_name, f.getvalue())
+                                        pub_url = supabase.storage.from_("farm_images").get_public_url(file_name)
+                                        
+                                        img_data_list.append({
+                                            "ImageID": int(datetime.now().strftime("%y%m%d%H%M%S")) + idx,
+                                            "Category": "Myilji",
+                                            "RefID": str(work_id),
+                                            "ImageURL": pub_url,
+                                            "UserID": current_uid
+                                        })
+                                    except Exception as img_e:
+                                        st.error(f"사진 업로드 중 오류가 발생했습니다 (Supabase Storage 'farm_images' 버킷 생성 여부 확인 필요): {img_e}")
+                                
+                                if img_data_list:
+                                    supabase.table("DB_Image").insert(img_data_list).execute()
+                                    
+                            st.success("✅ 영농일지가 성공적으로 저장되었습니다!")
+                            time.sleep(1.5)
+                            st.rerun()
+                            
+                        except Exception as e:
+                            st.error(f"🚨 저장 중 오류가 발생했습니다. DB 테이블 생성을 확인해주세요: {e}")
 
     # ----------------------------------------
     # 메뉴 6: 병해충 분석
