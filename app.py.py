@@ -1,12 +1,13 @@
 # ==========================================
-# 📌 버전: 34.9 | 수정일시: 2026.09.08
+# 📌 버전: 34.10 | 수정일시: 2026.09.08
 # 📌 주요 수정내용: 
 #    1. 모바일 UI/UX 최적화 (반응형 CSS 적용)
 #    2. 메인화면 실시간 날씨 및 기상청 초단기실황 연동
-#    3. 농약 검색 결과 표 고도화: '나의 방제이력' 완벽 매칭 (적색/청색 표시 및 방제약명 표시)
-#    4. [NEW] 스크롤바 두께 초대형 확대 (26px -> 36px)로 터치 편의성 극대화
-#    5. [NEW] '나의 영농일지' 메뉴 신설 (DB_Myilji 및 DB_Image 연동 다중 사진 업로드 구현)
-#    6. [NEW] 영농일지 카테고리에 '적과', '수확' 추가
+#    3. 농약 검색 결과 표 고도화 (방제이력 100% 매칭, 적색/청색 표시 및 방제약명 표시)
+#    4. 스크롤바 두께 초대형 확대 (36px)로 터치 편의성 극대화
+#    5. '나의 영농일지' 메뉴 신설 및 카테고리(적과, 수확) 추가, 다중 사진 업로드 구현
+#    6. [NEW] 메인 메뉴 8개 버튼 크기 축소 및 1줄 배치 (Flex-nowrap 적용)
+#    7. [NEW] 비회원/로그인 메뉴를 메인 메뉴와 완전히 다른 색상(블루그레이) 및 더 작은 크기로 분리 적용
 # ==========================================
 
 import streamlit as st
@@ -79,7 +80,7 @@ st.markdown("""
     <style>
     a.home-link { text-decoration: none !important; }
     
-    /* 💡 [핵심] 스크롤바 두께 초대형 확대 (36px)로 터치/마우스 조작 최적화 */
+    /* 스크롤바 두께 초대형 확대 (36px) 유지 */
     ::-webkit-scrollbar { width: 36px !important; height: 36px !important; }
     ::-webkit-scrollbar-track { background: #f1f1f1 !important; border-radius: 18px !important; box-shadow: inset 0 0 5px rgba(0,0,0,0.1) !important; }
     ::-webkit-scrollbar-thumb { background: #ffb74d !important; border-radius: 18px !important; border: 6px solid #f1f1f1 !important; }
@@ -87,11 +88,53 @@ st.markdown("""
     
     .hallabong-title { background-color: #e65100; padding: 15px; border-radius: 20px; text-align: center; color: white; font-weight: 900; font-size: 2.8rem; box-shadow: 0px 6px 15px rgba(230, 81, 0, 0.3); border: 3px solid #ffcc80; transition: transform 0.2s ease-in-out; margin-bottom: 10px; }
     .hallabong-title:hover { transform: scale(1.02); }
-    div[data-testid="stRadio"] div[role="radiogroup"] { display: flex; flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 8px; margin-bottom: 15px; }
+    
+    /* --- 라디오 버튼 공통 제어 --- */
     div[data-testid="stRadio"] div[role="radiogroup"] div[data-baseweb="radio"] div { display: none !important; }
-    div[data-testid="stRadio"] div[role="radiogroup"] label { background: linear-gradient(145deg, #e8f5e9, #c8e6c9) !important; border: 2px solid #a5d6a7 !important; padding: 8px 16px !important; border-radius: 12px !important; cursor: pointer; transition: all 0.1s ease-in-out; margin: 0 !important; }
-    div[data-testid="stRadio"] div[role="radiogroup"] label p { font-size: 17px !important; font-weight: 800 !important; color: #1b5e20 !important; margin: 0 !important; }
-    div[data-testid="stRadio"] div[role="radiogroup"] label:active, div[data-testid="stRadio"] div[role="radiogroup"] label:focus-within { transform: translateY(3px) !important; background: linear-gradient(145deg, #c8e6c9, #a5d6a7) !important; }
+    div[data-testid="stRadio"] div[role="radiogroup"] { display: flex; flex-direction: row; gap: 8px; }
+    div[data-testid="stRadio"] div[role="radiogroup"] label { margin: 0 !important; cursor: pointer; transition: all 0.1s ease-in-out; }
+
+    /* 💡 [핵심] 로그인/비회원 메뉴 (옵션 2개짜리) - 회색톤 & 최소 크기 */
+    div[data-testid="stRadio"]:has(label:nth-child(2)):not(:has(label:nth-child(3))) div[role="radiogroup"] { 
+        justify-content: flex-end; gap: 5px; 
+    }
+    div[data-testid="stRadio"]:has(label:nth-child(2)):not(:has(label:nth-child(3))) div[role="radiogroup"] label { 
+        background: linear-gradient(145deg, #eceff1, #cfd8dc) !important; 
+        border: 1px solid #b0bec5 !important; 
+        padding: 4px 10px !important; 
+        border-radius: 6px !important; 
+    }
+    div[data-testid="stRadio"]:has(label:nth-child(2)):not(:has(label:nth-child(3))) div[role="radiogroup"] label p { 
+        font-size: 13px !important; font-weight: 700 !important; color: #455a64 !important; margin: 0 !important; 
+    }
+    div[data-testid="stRadio"]:has(label:nth-child(2)):not(:has(label:nth-child(3))) div[role="radiogroup"] label:active, 
+    div[data-testid="stRadio"]:has(label:nth-child(2)):not(:has(label:nth-child(3))) div[role="radiogroup"] label:focus-within { 
+        background: linear-gradient(145deg, #cfd8dc, #b0bec5) !important; transform: translateY(2px) !important; 
+    }
+
+    /* 💡 [핵심] 8개 메인 메뉴 - 1줄 배치, 글자 축소, 초록색 톤 */
+    div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] { 
+        justify-content: center; 
+        flex-wrap: nowrap !important; /* 1줄 고정 */
+        overflow-x: auto; /* 화면 좁으면 가로 스크롤 허용 */
+        padding-bottom: 5px; margin-bottom: 15px; 
+    }
+    div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label { 
+        background: linear-gradient(145deg, #e8f5e9, #c8e6c9) !important; 
+        border: 2px solid #a5d6a7 !important; 
+        padding: 6px 8px !important; /* 크기 축소 */
+        border-radius: 8px !important; 
+        flex: 1 1 auto; text-align: center; white-space: nowrap; /* 줄바꿈 방지 */
+    }
+    div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label p { 
+        font-size: 13.5px !important; /* 폰트 크기 축소 */
+        font-weight: 800 !important; color: #1b5e20 !important; margin: 0 !important; 
+    }
+    div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label:active, 
+    div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label:focus-within { 
+        transform: translateY(3px) !important; background: linear-gradient(145deg, #c8e6c9, #a5d6a7) !important; 
+    }
+
     div[data-testid="stForm"], div[data-testid="stExpander"] { font-size: 18px !important; font-weight: 800 !important; }
     input[type="text"], input[type="password"], div[data-baseweb="select"] span, div[data-baseweb="select"] input, div[data-testid="stDateInput"] input, div[data-testid="stTimeInput"] input, textarea { font-size: 16px !important; padding: 6px 10px !important; }
     div[data-testid="stForm"] { border: 3px solid #ffb74d; border-radius: 15px; padding: 25px; box-shadow: 0px 6px 15px rgba(255,183,77,0.15); margin-bottom: 15px; }
@@ -123,25 +166,11 @@ st.markdown("""
 
     /* 모바일 반응형 최적화 코드 */
     @media screen and (max-width: 768px) {
-        .hallabong-title { 
-            font-size: 1.8rem !important;  
-            padding: 10px !important;      
-            border-radius: 15px !important;
-        }
-        .hallabong-title img {
-            width: 45px !important;        
-            margin-right: 10px !important;
-        }
-        div[data-testid="stRadio"] div[role="radiogroup"] label { 
-            padding: 6px 12px !important;  
-            border-radius: 8px !important;
-        }
-        div[data-testid="stRadio"] div[role="radiogroup"] label p { 
-            font-size: 15px !important;    
-        }
-        .card-weather {
-            font-size: 1.05rem !important; 
-        }
+        .hallabong-title { font-size: 1.8rem !important; padding: 10px !important; border-radius: 15px !important; }
+        .hallabong-title img { width: 45px !important; margin-right: 10px !important; }
+        div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] { flex-wrap: nowrap !important; overflow-x: auto; justify-content: flex-start; }
+        div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label p { font-size: 12.5px !important; }
+        .card-weather { font-size: 1.05rem !important; }
     }
     </style>
 """, unsafe_allow_html=True)
@@ -861,7 +890,6 @@ else:
     elif menu == "나의 영농일지":
         st.subheader("📓 나의 영농일지")
         
-        # 1. 기존 영농일지 목록 불러오기
         df_ilji = pd.DataFrame()
         if supabase_connected:
             try:
@@ -879,7 +907,6 @@ else:
                 remark = row.get("Remark", "")
                 user_id = row.get("UserID", "")
                 
-                # DB_Image 연동하여 해당 일지의 사진 가져오기
                 img_urls = []
                 try:
                     res_img = supabase.table("DB_Image").select("ImageURL").eq("RefID", str(w_id)).eq("Category", "Myilji").execute()
@@ -902,7 +929,7 @@ else:
                     
                     if img_urls:
                         cols = st.columns(min(len(img_urls), 5))
-                        for i, url in enumerate(img_urls[:5]): # 최대 5장 표시
+                        for i, url in enumerate(img_urls[:5]): 
                             with cols[i]:
                                 st.image(url, use_container_width=True)
                     st.markdown("<hr style='margin:15px 0; border-top: 1px dashed #cccccc;'>", unsafe_allow_html=True)
@@ -911,14 +938,12 @@ else:
             
         st.markdown("<br>", unsafe_allow_html=True)
         
-        # 2. 새로운 영농일지 작성 폼
         with st.expander("➕ 새로운 영농일지 작성", expanded=False):
             with st.form("myilji_form", clear_on_submit=True):
                 col1, col2 = st.columns(2)
                 with col1:
                     i_date = st.date_input("📅 일자", value=date.today())
                 with col2:
-                    # 💡 카테고리에 적과, 수확 추가
                     i_cat = st.selectbox("분류 (작업 종류)", ["농약", "제초", "급수", "시비", "전정", "적과", "수확", "기타"])
                 
                 i_work = st.text_area("작업 내용", placeholder="오늘 진행한 작업 내용이나 나무의 상태 등을 자유롭게 적어주세요.")
@@ -935,7 +960,6 @@ else:
                         work_id = int(datetime.now().strftime("%y%m%d%H%M%S"))
                         current_uid = st.session_state.current_user.get('id', 'guest') if st.session_state.logged_in else 'guest'
                         
-                        # DB_Myilji 저장 데이터
                         ilji_data = {
                             "WorkID": work_id,
                             "UserID": current_uid,
@@ -948,14 +972,12 @@ else:
                         try:
                             supabase.table("DB_Myilji").insert(ilji_data).execute()
                             
-                            # DB_Image 저장 및 Supabase Storage 업로드 로직
                             if i_files:
                                 img_data_list = []
                                 for idx, f in enumerate(i_files):
                                     file_ext = f.name.split('.')[-1]
                                     file_name = f"myilji/{work_id}_{idx}.{file_ext}"
                                     try:
-                                        # 'farm_images'라는 이름의 버킷이 Supabase Storage에 생성되어 있어야 정상 작동합니다.
                                         supabase.storage.from_("farm_images").upload(file_name, f.getvalue())
                                         pub_url = supabase.storage.from_("farm_images").get_public_url(file_name)
                                         
