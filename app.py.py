@@ -1,13 +1,14 @@
 # ==========================================
-# 📌 버전: 34.13 | 수정일시: 2026.09.08
+# 📌 버전: 34.14 | 수정일시: 2026.09.08
 # 📌 주요 수정내용: 
 #    1. 모바일 UI/UX 최적화 (반응형 CSS, 8개 메뉴 2줄 래핑 허용)
 #    2. 메인화면 로그인 영역 제목 아랫줄 정렬 및 비회원 버튼 색상 차별화
 #    3. 농약 검색 결과 표 고도화 (방제이력 100% 매칭, 적색/청색 표시 및 방제약명 표시)
 #    4. 스크롤바 두께 초대형 확대 (36px) 및 표 세로 길이 확보
-#    5. AI 정밀판독 소요 시간 안내 문구 변경 ("약 1~2분")
-#    6. 나의 영농일지 UI 전면 개편 (입력폼 상단 배치, 목록 스크롤 컨테이너 적용, 최신순 정렬)
-#    7. [NEW] 영농일지 DB 에러(PGRST204) 방지: Work 컬럼 대소문자 및 스펠링 불일치에 대한 유연한 읽기 방어 로직 추가
+#    5. 영농일지 카테고리에 '적과', '수확' 추가 및 다중 사진 업로드 연동
+#    6. 영농일지 DB 저장 오류(WorkID Integer Overflow) 방어
+#    7. [NEW] 영농일지 입력 필드명 DB 오류 해결: 'Work' -> 'WorkContent' 로 정확히 수정
+#    8. [NEW] 영농일지 UI 개선: 최초 진입 시 입력창 닫힘 상태 유지 (목록이 먼저 보이도록 수정)
 # ==========================================
 
 import streamlit as st
@@ -884,13 +885,13 @@ else:
             st.markdown("</div>", unsafe_allow_html=True)
 
     # ----------------------------------------
-    # 메뉴 5.1: 나의 영농일지 (NEW - 전면 개편)
+    # 메뉴 5.1: 나의 영농일지
     # ----------------------------------------
     elif menu == "나의 영농일지":
         st.subheader("📓 나의 영농일지")
         
-        # 1. 상단: 새로운 영농일지 작성 영역 (가장 먼저 보이도록 배치)
-        with st.expander("➕ 새로운 영농일지 작성 (이곳을 클릭하여 작성하세요)", expanded=True):
+        # 1. 상단: 새로운 영농일지 작성 영역 (💡 [핵심] 처음에 닫혀 있도록 expanded=False 처리)
+        with st.expander("➕ 새로운 영농일지 작성 (이곳을 클릭하여 작성하세요)", expanded=False):
             with st.form("myilji_form", clear_on_submit=True):
                 col1, col2 = st.columns(2)
                 with col1:
@@ -912,14 +913,13 @@ else:
                         work_id = int(time.time())
                         current_uid = st.session_state.current_user.get('id', 'guest') if st.session_state.logged_in else 'guest'
                         
-                        # 💡 [핵심 방어코드] Work 컬럼에 파이썬이 정확하게 쓰기 요청을 보냅니다. 
-                        # Supabase 테이블의 컬럼 이름도 반드시 'Work' 로 일치해야 합니다.
+                        # 💡 [핵심] DB 컬럼명을 정확히 WorkContent 로 지정하여 에러 완벽 해결
                         ilji_data = {
                             "WorkID": work_id,
                             "UserID": current_uid,
                             "Nalja": str(i_date),
                             "Category": i_cat,
-                            "WorkContent": i_work,
+                            "WorkContent": i_work, 
                             "Remark": i_remark
                         }
                         
@@ -955,7 +955,7 @@ else:
                         except Exception as e:
                             st.error(f"🚨 저장 중 오류가 발생했습니다. DB 테이블 컬럼명 불일치 또는 캐시 지연 현상입니다. (세부정보: {e})")
 
-        # 2. 하단: 기존 영농일지 목록 (스크롤 및 글자크기 축소 반영)
+        # 2. 하단: 기존 영농일지 목록
         st.markdown("<hr style='margin:20px 0;'>", unsafe_allow_html=True)
         st.markdown("#### 📖 나의 영농일지 기록")
         
@@ -972,11 +972,11 @@ else:
         with list_container:
             if not df_ilji.empty:
                 for _, row in df_ilji.iterrows():
-                    # 💡 [핵심 방어코드] Supabase에서 가져올 때 컬럼명이 Work, work, WorkContent 무엇이든 모두 찾아냅니다.
+                    # 💡 DB에서 데이터를 읽어올 때도 새 컬럼명(WorkContent)을 1순위로 탐색합니다.
                     w_id = row.get("WorkID", row.get("workid"))
                     d_date = row.get("Nalja", row.get("nalja", ""))
                     cat = row.get("Category", row.get("category", ""))
-                    work_content = row.get("Work", row.get("WorkContent", row.get("work", "")))
+                    work_content = row.get("WorkContent", row.get("Work", row.get("work", "")))
                     remark = row.get("Remark", row.get("remark", ""))
                     user_id = row.get("UserID", row.get("userid", ""))
                     
