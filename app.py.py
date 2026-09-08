@@ -1,13 +1,13 @@
 # ==========================================
-# 📌 버전: 34.15 | 수정일시: 2026.09.08
+# 📌 버전: 34.16 | 수정일시: 2026.09.08
 # 📌 주요 수정내용: 
 #    1. 모바일 UI/UX 최적화 (반응형 CSS, 메뉴 2줄 래핑)
 #    2. 농약 검색 결과 표 고도화 (방제이력 매칭, 방제약명 표시)
 #    3. 스크롤바 두께 및 표 세로 길이 대폭 확보
-#    4. 나의 영농일지 카테고리(적과, 수확 추가), UI 개편, DB 에러(PGRST204) 완벽 방어
-#    5. [NEW] 로그인/회원가입 분리: 기존 회원은 ID/PW만으로 DB_Userdata 연동 로그인 지원
-#    6. [NEW] 데이터 독립성 확보: '나의 방제이력' 및 '나의 영농일지'에 로그인한 UserID 데이터만 필터링 출력
-#    7. [NEW] 방제이력 저장 시 UserID가 DBbangje 테이블에 함께 저장되도록 보강
+#    4. 나의 영농일지 카테고리(적과, 수확 추가), UI 개편, DB 에러 완벽 방어
+#    5. 로그인/회원가입 분리 및 DB_Userdata 연동
+#    6. [NEW] DB_Userdata 스키마 불일치 에러 완벽 해결: 'Password' -> 'UserPassword'로 매칭
+#    7. [NEW] CorpID(Int) 타입 충돌 방지: 회원가입 시 텍스트 작물명 전송 임시 제외(방어 코드)
 # ==========================================
 
 import streamlit as st
@@ -207,12 +207,10 @@ def load_data_from_supabase():
     error_str = " | ".join(error_msgs) if error_msgs else ""
     return df_nongyak, df_moa, pesticide_list, pest_list, error_str
 
-# 💡 [필터링 핵심] 로그인한 사용자의 ID를 매개변수로 받아 본인 데이터만 가져옴
 @st.cache_data(ttl=60)
 def fetch_spray_history(user_id):
     if not supabase_connected or not user_id: return pd.DataFrame()
     try:
-        # 로그인한 사용자의 기록만 조회되도록 .eq("UserID", user_id) 필터 추가
         response = supabase.table("DBbangje").select("*").eq("UserID", user_id).order("Date", desc=True).execute()
         df = pd.DataFrame(response.data)
         if not df.empty:
@@ -237,7 +235,6 @@ def fetch_spray_history(user_id):
 df_database, df_moa_db, pesticide_list, pest_list, db_error_msg = load_data_from_supabase()
 
 def render_styled_dataframe(df, grid_height=500):
-    # 로그인한 사용자의 ID로 이력 가져오기
     current_uid = st.session_state.current_user.get('id', 'guest') if st.session_state.logged_in else 'guest'
     df_hist = fetch_spray_history(current_uid)
     
@@ -513,7 +510,6 @@ st.markdown("<hr style='margin-top: 10px; margin-bottom: 15px;'>", unsafe_allow_
 # 🚀 본문 영역 분기 처리
 # ==========================================
 
-# 💡 [핵심] 로그인/회원가입 분리 탭 적용
 if st.session_state.get('login_mode') == "로그인" and not st.session_state.logged_in:
     st.markdown("### 🔐 회원 접속")
     tab_login, tab_register = st.tabs(["기존 회원 로그인", "신규 회원 가입"])
@@ -527,7 +523,8 @@ if st.session_state.get('login_mode') == "로그인" and not st.session_state.lo
             if st.form_submit_button("로그인", type="primary"):
                 if log_id and log_pw:
                     try:
-                        res = supabase.table("DB_Userdata").select("*").eq("UserID", log_id).eq("Password", log_pw).execute()
+                        # 💡 [핵심] DB 컬럼명이 UserPassword 로 맞춰짐
+                        res = supabase.table("DB_Userdata").select("*").eq("UserID", log_id).eq("UserPassword", log_pw).execute()
                         if res.data and len(res.data) > 0:
                             user_info = res.data[0]
                             st.session_state.logged_in = True
@@ -563,12 +560,13 @@ if st.session_state.get('login_mode') == "로그인" and not st.session_state.lo
                         if check.data and len(check.data) > 0:
                             st.error("이미 존재하는 아이디입니다. 다른 아이디를 사용해주세요.")
                         else:
+                            # 💡 [핵심] 'Password' 대신 'UserPassword' 사용. 
+                            # CorpID는 숫자(Int)이므로 텍스트 값 전송 시 에러가 나지 않도록 제외
                             new_user = {
                                 "UserID": reg_id,
-                                "Password": reg_pw,
+                                "UserPassword": reg_pw, 
                                 "UserName": reg_name,
-                                "Location": reg_loc,
-                                "Crop": reg_crop
+                                "Location": reg_loc
                             }
                             supabase.table("DB_Userdata").insert(new_user).execute()
                             st.session_state.logged_in = True
@@ -793,7 +791,6 @@ else:
     elif menu == "나의 방제이력":
         st.subheader("📋 나의 방제이력 (방제 일지)")
         
-        # 💡 [핵심] 로그인한 사람의 UserID 넘기기
         current_uid = st.session_state.current_user.get('id', 'guest') if st.session_state.logged_in else 'guest'
         df_history = fetch_spray_history(current_uid)
         
@@ -897,7 +894,6 @@ else:
                         try: qty_val = int(str(rec['qty']).replace(',', '').strip()) if str(rec['qty']).strip() else None
                         except: qty_val = None
                             
-                        # 💡 [핵심 보강] UserID 필드도 DBbangje 테이블에 명확히 저장되도록 추가
                         db_insert_data.append({
                             "ID": base_id + idx, "Date": dt_str, "Time": formatted_time_str, "Nongyak": rec['name'],
                             "Type": rec['type'], "Kijak": rec['moa'], "Spec": rec['size'], "Qty": qty_val,
@@ -991,7 +987,6 @@ else:
         df_ilji = pd.DataFrame()
         if supabase_connected:
             try:
-                # 💡 [핵심] 로그인한 사용자의 ID로만 영농일지를 조회하도록 필터링 추가
                 res_ilji = supabase.table("DB_Myilji").select("*").eq("UserID", current_uid).order("Nalja", desc=True).order("WorkID", desc=True).execute()
                 df_ilji = pd.DataFrame(res_ilji.data)
             except Exception as e:
