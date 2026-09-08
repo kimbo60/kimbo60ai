@@ -1,13 +1,15 @@
 # ==========================================
-# 📌 버전: 34.10 | 수정일시: 2026.09.08
+# 📌 버전: 34.11 | 수정일시: 2026.09.08
 # 📌 주요 수정내용: 
 #    1. 모바일 UI/UX 최적화 (반응형 CSS 적용)
 #    2. 메인화면 실시간 날씨 및 기상청 초단기실황 연동
 #    3. 농약 검색 결과 표 고도화 (방제이력 100% 매칭, 적색/청색 표시 및 방제약명 표시)
 #    4. 스크롤바 두께 초대형 확대 (36px)로 터치 편의성 극대화
 #    5. '나의 영농일지' 메뉴 신설 및 카테고리(적과, 수확) 추가, 다중 사진 업로드 구현
-#    6. [NEW] 메인 메뉴 8개 버튼 크기 축소 및 1줄 배치 (Flex-nowrap 적용)
-#    7. [NEW] 비회원/로그인 메뉴를 메인 메뉴와 완전히 다른 색상(블루그레이) 및 더 작은 크기로 분리 적용
+#    6. 비회원/로그인 메뉴 차별화 (블루그레이 색상 적용)
+#    7. [NEW] 메인 메뉴 반응형 2줄 자동 줄바꿈 허용 (모바일 스크롤 불편 해소)
+#    8. [NEW] 헤더 영역 "로그인/비회원" 버튼을 타이틀 아래쪽 기준선으로 정렬 맞춤
+#    9. [NEW] 병해충 분석 정밀판독 안내 문구를 "약 1~2분"으로 수정
 # ==========================================
 
 import streamlit as st
@@ -94,7 +96,7 @@ st.markdown("""
     div[data-testid="stRadio"] div[role="radiogroup"] { display: flex; flex-direction: row; gap: 8px; }
     div[data-testid="stRadio"] div[role="radiogroup"] label { margin: 0 !important; cursor: pointer; transition: all 0.1s ease-in-out; }
 
-    /* 💡 [핵심] 로그인/비회원 메뉴 (옵션 2개짜리) - 회색톤 & 최소 크기 */
+    /* 💡 로그인/비회원 메뉴 (옵션 2개짜리) - 회색톤 & 최소 크기 */
     div[data-testid="stRadio"]:has(label:nth-child(2)):not(:has(label:nth-child(3))) div[role="radiogroup"] { 
         justify-content: flex-end; gap: 5px; 
     }
@@ -112,22 +114,21 @@ st.markdown("""
         background: linear-gradient(145deg, #cfd8dc, #b0bec5) !important; transform: translateY(2px) !important; 
     }
 
-    /* 💡 [핵심] 8개 메인 메뉴 - 1줄 배치, 글자 축소, 초록색 톤 */
+    /* 💡 [핵심] 8개 메인 메뉴 - 공간 부족 시 자동으로 2줄로 넘어가도록 wrap 적용 */
     div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] { 
         justify-content: center; 
-        flex-wrap: nowrap !important; /* 1줄 고정 */
-        overflow-x: auto; /* 화면 좁으면 가로 스크롤 허용 */
+        flex-wrap: wrap !important; /* 1줄 고정 해제 -> 2줄 허용 */
         padding-bottom: 5px; margin-bottom: 15px; 
     }
     div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label { 
         background: linear-gradient(145deg, #e8f5e9, #c8e6c9) !important; 
         border: 2px solid #a5d6a7 !important; 
-        padding: 6px 8px !important; /* 크기 축소 */
+        padding: 6px 8px !important; 
         border-radius: 8px !important; 
-        flex: 1 1 auto; text-align: center; white-space: nowrap; /* 줄바꿈 방지 */
+        flex: 1 1 auto; text-align: center; white-space: nowrap; 
     }
     div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label p { 
-        font-size: 13.5px !important; /* 폰트 크기 축소 */
+        font-size: 13.5px !important; 
         font-weight: 800 !important; color: #1b5e20 !important; margin: 0 !important; 
     }
     div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label:active, 
@@ -168,9 +169,9 @@ st.markdown("""
     @media screen and (max-width: 768px) {
         .hallabong-title { font-size: 1.8rem !important; padding: 10px !important; border-radius: 15px !important; }
         .hallabong-title img { width: 45px !important; margin-right: 10px !important; }
-        div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] { flex-wrap: nowrap !important; overflow-x: auto; justify-content: flex-start; }
         div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label p { font-size: 12.5px !important; }
         .card-weather { font-size: 1.05rem !important; }
+        .login-spacer { height: 5px !important; } /* 모바일에서는 로그인 여백 축소 */
     }
     </style>
 """, unsafe_allow_html=True)
@@ -524,7 +525,8 @@ with col_logo:
     icon_tag = f'<img src="{icon_base64}" width="60" style="vertical-align: middle; margin-right: 15px; filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.3));">' if icon_base64 else '🍊'
     st.markdown(f"<a href='/' target='_self' class='home-link'><div class='hallabong-title'>{icon_tag} 내가 찾는 농약</div></a>", unsafe_allow_html=True)
 with col_login:
-    st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+    # 💡 [핵심] 로그인/비회원 버튼이 타이틀과 아래쪽 정렬 되도록 동적 여백 추가
+    st.markdown("<div style='height: 40px;' class='login-spacer'></div>", unsafe_allow_html=True)
     if st.session_state.logged_in:
         st.markdown(f"<div style='text-align: right; font-size: 16px; margin-bottom: 5px;'><b>{st.session_state.current_user.get('name')}</b>님 환영합니다!</div>", unsafe_allow_html=True)
         if st.button("로그아웃", use_container_width=True):
@@ -885,7 +887,7 @@ else:
             st.markdown("</div>", unsafe_allow_html=True)
 
     # ----------------------------------------
-    # 메뉴 5.1: 나의 영농일지 (NEW)
+    # 메뉴 5.1: 나의 영농일지
     # ----------------------------------------
     elif menu == "나의 영농일지":
         st.subheader("📓 나의 영농일지")
@@ -1033,7 +1035,7 @@ else:
             
             st.markdown("<br>", unsafe_allow_html=True)
             
-            st.markdown("<p style='color: #e65100; font-size: 15px; font-weight: bold; margin-bottom: 10px;'>💡 안내: 정밀판독에 약 2분 정도의 시간이 소요될 수 있습니다.</p>", unsafe_allow_html=True)
+            st.markdown("<p style='color: #e65100; font-size: 15px; font-weight: bold; margin-bottom: 10px;'>💡 안내: 정밀판독에 약 1~2분 정도의 시간이 소요될 수 있습니다.</p>", unsafe_allow_html=True)
             
             col_start, col_reset = st.columns([7, 3])
             with col_start:
@@ -1047,7 +1049,7 @@ else:
                 if not gemini_ready:
                     st.error("🚨 API 키를 확인할 수 없어 판독을 시작할 수 없습니다.")
                 else:
-                    with st.spinner("구글 인공지능이 최적의 최신 모델을 찾아 사진을 분석하고 있습니다... (약 2분 소요될 수 있습니다)"):
+                    with st.spinner("구글 인공지능이 최적의 최신 모델을 찾아 사진을 분석하고 있습니다... (약 1~2분 소요될 수 있습니다)"):
                         prompt = """
                         당신은 대한민국 제주도 환경의 감귤류(노지 감귤, 한라봉 등) 병해충 전문가입니다.
                         첨부된 사진들을 꼼꼼하게 분석하고, 어떤 병이나 해충의 피해인지 종합적으로 진단해주세요.
