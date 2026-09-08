@@ -1,13 +1,14 @@
 # ==========================================
-# 📌 버전: 34.16 | 수정일시: 2026.09.08
+# 📌 버전: 34.17 | 수정일시: 2026.09.08
 # 📌 주요 수정내용: 
 #    1. 모바일 UI/UX 최적화 (반응형 CSS, 메뉴 2줄 래핑)
 #    2. 농약 검색 결과 표 고도화 (방제이력 매칭, 방제약명 표시)
-#    3. 스크롤바 두께 및 표 세로 길이 대폭 확보
-#    4. 나의 영농일지 카테고리(적과, 수확 추가), UI 개편, DB 에러 완벽 방어
-#    5. 로그인/회원가입 분리 및 DB_Userdata 연동
-#    6. [NEW] DB_Userdata 스키마 불일치 에러 완벽 해결: 'Password' -> 'UserPassword'로 매칭
-#    7. [NEW] CorpID(Int) 타입 충돌 방지: 회원가입 시 텍스트 작물명 전송 임시 제외(방어 코드)
+#    3. 영농일지 카테고리(적과, 수확 추가), UI 개편, DB 에러 완벽 방어
+#    4. 로그인/회원가입 분리 및 DB_Userdata 연동
+#    5. [NEW] 최고관리자(admin) 하드코딩 로그인 지원 (ID: admin, PW: admin)
+#    6. [NEW] 게시판(정보교환마당) 본인 및 관리자 권한 분리 (관리자는 모든 글 수정/삭제 가능)
+#    7. [NEW] 관리자가 질문 글 수정 시, '답변(Reply)'을 직접 작성/수정할 수 있는 기능 추가
+#    8. [NEW] 공지 등록 메뉴를 일반 회원에게 숨기고 관리자에게만 노출하도록 보안 강화
 # ==========================================
 
 import streamlit as st
@@ -521,9 +522,20 @@ if st.session_state.get('login_mode') == "로그인" and not st.session_state.lo
             log_pw = st.text_input("비밀번호 (PW) *", type="password", key="log_pw")
             
             if st.form_submit_button("로그인", type="primary"):
-                if log_id and log_pw:
+                # 💡 [핵심] 최고관리자(admin) 하드코딩 로그인 기능
+                if log_id == "admin" and log_pw == "admin":
+                    st.session_state.logged_in = True
+                    st.session_state.current_user = {
+                        'id': 'admin',
+                        'name': '최고관리자',
+                        'location': '시스템',
+                        'crop': '전체'
+                    }
+                    st.success("👑 최고관리자 계정으로 접속했습니다.")
+                    time.sleep(1)
+                    st.rerun()
+                elif log_id and log_pw:
                     try:
-                        # 💡 [핵심] DB 컬럼명이 UserPassword 로 맞춰짐
                         res = supabase.table("DB_Userdata").select("*").eq("UserID", log_id).eq("UserPassword", log_pw).execute()
                         if res.data and len(res.data) > 0:
                             user_info = res.data[0]
@@ -555,28 +567,29 @@ if st.session_state.get('login_mode') == "로그인" and not st.session_state.lo
             
             if st.form_submit_button("가입하기", type="primary"):
                 if reg_id and reg_pw and reg_name:
-                    try:
-                        check = supabase.table("DB_Userdata").select("UserID").eq("UserID", reg_id).execute()
-                        if check.data and len(check.data) > 0:
-                            st.error("이미 존재하는 아이디입니다. 다른 아이디를 사용해주세요.")
-                        else:
-                            # 💡 [핵심] 'Password' 대신 'UserPassword' 사용. 
-                            # CorpID는 숫자(Int)이므로 텍스트 값 전송 시 에러가 나지 않도록 제외
-                            new_user = {
-                                "UserID": reg_id,
-                                "UserPassword": reg_pw, 
-                                "UserName": reg_name,
-                                "Location": reg_loc
-                            }
-                            supabase.table("DB_Userdata").insert(new_user).execute()
-                            st.session_state.logged_in = True
-                            st.session_state.current_user = {'id': reg_id, 'name': reg_name, 'location': reg_loc, 'crop': reg_crop}
-                            st.session_state.show_history_prompt = True
-                            st.success("가입이 완료되었습니다!")
-                            time.sleep(1)
-                            st.rerun()
-                    except Exception as e:
-                        st.error(f"가입 처리 중 오류 발생 (DB_Userdata 테이블 확인 필요): {e}")
+                    if reg_id == "admin":
+                        st.error("해당 아이디는 사용할 수 없습니다.")
+                    else:
+                        try:
+                            check = supabase.table("DB_Userdata").select("UserID").eq("UserID", reg_id).execute()
+                            if check.data and len(check.data) > 0:
+                                st.error("이미 존재하는 아이디입니다. 다른 아이디를 사용해주세요.")
+                            else:
+                                new_user = {
+                                    "UserID": reg_id,
+                                    "UserPassword": reg_pw, 
+                                    "UserName": reg_name,
+                                    "Location": reg_loc
+                                }
+                                supabase.table("DB_Userdata").insert(new_user).execute()
+                                st.session_state.logged_in = True
+                                st.session_state.current_user = {'id': reg_id, 'name': reg_name, 'location': reg_loc, 'crop': reg_crop}
+                                st.session_state.show_history_prompt = True
+                                st.success("가입이 완료되었습니다!")
+                                time.sleep(1)
+                                st.rerun()
+                        except Exception as e:
+                            st.error(f"가입 처리 중 오류 발생 (DB_Userdata 테이블 확인 필요): {e}")
                 else:
                     st.warning("필수 항목(*표시)을 모두 입력해주세요.")
 
@@ -1135,6 +1148,9 @@ else:
     elif menu == "정보교환마당":
         st.subheader("💬 정보교환마당")
         
+        # 💡 [권한 확인] 현재 사용자가 로그인한 최고관리자(admin)인지 확인
+        is_admin = st.session_state.logged_in and st.session_state.current_user.get('id') == 'admin'
+        
         df_board = pd.DataFrame()
         if supabase_connected:
             try:
@@ -1177,7 +1193,9 @@ else:
                             date_str = str(row.get('created_at', ''))[:10]
                             st.markdown(f"<div style='background-color: #fffde7; padding: 15px; border-radius: 8px; border: 1px solid #fdd835; margin-bottom: 8px;'><li style='margin-bottom: 5px; line-height: 1.4; list-style-type: none;'>{content} <br><span style='font-size:12px; color:gray;'>({date_str})</span></li></div>", unsafe_allow_html=True)
                             
-                            if st.session_state.logged_in and str(row.get('UserID')) == str(st.session_state.current_user.get('id', '')):
+                            # 💡 [핵심] 작성자 본인이거나 최고관리자일 경우 수정/삭제 버튼 표시
+                            is_author = st.session_state.logged_in and str(row.get('UserID')) == str(st.session_state.current_user.get('id', ''))
+                            if is_author or is_admin:
                                 c1, c2, _ = st.columns([1.5, 1.5, 7])
                                 with c1:
                                     if st.button("수정", key=f"edit_btn_n_{post_id}", use_container_width=True):
@@ -1193,22 +1211,24 @@ else:
                 else: st.info("등록된 공지사항이 없습니다.")
             else: st.info("등록된 공지사항이 없습니다.")
             
-            with st.expander("➕ 공지 등록 (관리자용)"):
-                with st.form("notice_form", clear_on_submit=True):
-                    new_notice = st.text_area("공지 내용 입력", height=100, placeholder="새로운 공지사항을 입력하세요.")
-                    if st.form_submit_button("공지 등록", type="primary"):
-                        if new_notice:
-                            insert_data = {
-                                "ID": int(datetime.now().strftime("%y%m%d%H%M%S")), "Type": "공지", "Author": "관리자",
-                                "Content": new_notice, "UserID": st.session_state.current_user.get('id', 'admin') if st.session_state.logged_in else "admin"
-                            }
-                            try:
-                                supabase.table("DBboard").insert(insert_data).execute()
-                                st.success("✅ 공지가 등록되었습니다.")
-                                time.sleep(1)
-                                st.rerun()
-                            except Exception as e: st.error(f"🚨 공지 등록 실패: {e}")
-                        else: st.warning("내용을 입력해주세요.")
+            # 💡 [핵심] 공지 등록 메뉴는 관리자 계정으로 접속했을 때만 나타나게 처리
+            if is_admin:
+                with st.expander("➕ 공지 등록 (관리자 전용)"):
+                    with st.form("notice_form", clear_on_submit=True):
+                        new_notice = st.text_area("공지 내용 입력", height=100, placeholder="새로운 공지사항을 입력하세요.")
+                        if st.form_submit_button("공지 등록", type="primary"):
+                            if new_notice:
+                                insert_data = {
+                                    "ID": int(datetime.now().strftime("%y%m%d%H%M%S")), "Type": "공지", "Author": "최고관리자",
+                                    "Content": new_notice, "UserID": "admin"
+                                }
+                                try:
+                                    supabase.table("DBboard").insert(insert_data).execute()
+                                    st.success("✅ 공지가 등록되었습니다.")
+                                    time.sleep(1)
+                                    st.rerun()
+                                except Exception as e: st.error(f"🚨 공지 등록 실패: {e}")
+                            else: st.warning("내용을 입력해주세요.")
 
         with col_qa:
             st.markdown("<div class='custom-card card-qa' style='min-height: auto; padding: 15px; margin-bottom: 15px;'><h4 style='margin:0;'>❓ 질문하고 답하기</h4></div>", unsafe_allow_html=True)
@@ -1221,16 +1241,27 @@ else:
                         
                         if st.session_state.edit_post_id == post_id:
                             with st.form(key=f"edit_form_q_{post_id}"):
-                                new_content = st.text_area("질문 수정", value=row.get('Content', ''))
+                                new_content = st.text_area("질문 내용 수정", value=row.get('Content', ''))
+                                
+                                # 💡 [핵심] 관리자가 수정할 때는 답변(Reply)을 달 수 있는 텍스트 영역 활성화
+                                new_reply = row.get('Reply', '')
+                                if is_admin:
+                                    st.markdown("<p style='color:#2e7d32; font-weight:bold; margin-top:10px; margin-bottom:0px;'>[답변 작성란 - 관리자 전용]</p>", unsafe_allow_html=True)
+                                    new_reply = st.text_area("답변 작성/수정", value=row.get('Reply', '') if row.get('Reply') else '', label_visibility="collapsed")
+                                    
                                 c1, c2 = st.columns(2)
                                 with c1: submit_edit = st.form_submit_button("저장", type="primary")
                                 with c2: cancel_edit = st.form_submit_button("취소")
                                 
                                 if submit_edit:
                                     try:
-                                        supabase.table("DBboard").update({"Content": new_content}).eq("ID", post_id).execute()
+                                        update_data = {"Content": new_content}
+                                        if is_admin: # 관리자는 답변 내용도 업데이트 항목에 포함
+                                            update_data["Reply"] = new_reply
+                                            
+                                        supabase.table("DBboard").update(update_data).eq("ID", post_id).execute()
                                         st.session_state.edit_post_id = None
-                                        st.success("수정되었습니다.")
+                                        st.success("수정 및 답변 등록이 완료되었습니다.")
                                         time.sleep(1)
                                         st.rerun()
                                     except Exception as e: st.error(f"수정 실패: {e}")
@@ -1249,10 +1280,13 @@ else:
                             qa_html += "</div>"
                             st.markdown(qa_html, unsafe_allow_html=True)
                             
-                            if st.session_state.logged_in and str(row.get('UserID')) == str(st.session_state.current_user.get('id', '')):
+                            # 💡 [핵심] 작성자 본인이거나 최고관리자일 경우 수정/삭제 버튼 표시
+                            is_author = st.session_state.logged_in and str(row.get('UserID')) == str(st.session_state.current_user.get('id', ''))
+                            if is_author or is_admin:
                                 c1, c2, _ = st.columns([1.5, 1.5, 7])
                                 with c1:
-                                    if st.button("수정", key=f"edit_btn_q_{post_id}", use_container_width=True):
+                                    btn_label = "답변/수정" if is_admin else "수정"
+                                    if st.button(btn_label, key=f"edit_btn_q_{post_id}", use_container_width=True):
                                         st.session_state.edit_post_id = post_id
                                         st.rerun()
                                 with c2:
