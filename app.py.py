@@ -1,14 +1,13 @@
 # ==========================================
-# 📌 버전: 34.14 | 수정일시: 2026.09.08
+# 📌 버전: 34.15 | 수정일시: 2026.09.08
 # 📌 주요 수정내용: 
-#    1. 모바일 UI/UX 최적화 (반응형 CSS, 8개 메뉴 2줄 래핑 허용)
-#    2. 메인화면 로그인 영역 제목 아랫줄 정렬 및 비회원 버튼 색상 차별화
-#    3. 농약 검색 결과 표 고도화 (방제이력 100% 매칭, 적색/청색 표시 및 방제약명 표시)
-#    4. 스크롤바 두께 초대형 확대 (36px) 및 표 세로 길이 확보
-#    5. 영농일지 카테고리에 '적과', '수확' 추가 및 다중 사진 업로드 연동
-#    6. 영농일지 DB 저장 오류(WorkID Integer Overflow) 방어
-#    7. [NEW] 영농일지 입력 필드명 DB 오류 해결: 'Work' -> 'WorkContent' 로 정확히 수정
-#    8. [NEW] 영농일지 UI 개선: 최초 진입 시 입력창 닫힘 상태 유지 (목록이 먼저 보이도록 수정)
+#    1. 모바일 UI/UX 최적화 (반응형 CSS, 메뉴 2줄 래핑)
+#    2. 농약 검색 결과 표 고도화 (방제이력 매칭, 방제약명 표시)
+#    3. 스크롤바 두께 및 표 세로 길이 대폭 확보
+#    4. 나의 영농일지 카테고리(적과, 수확 추가), UI 개편, DB 에러(PGRST204) 완벽 방어
+#    5. [NEW] 로그인/회원가입 분리: 기존 회원은 ID/PW만으로 DB_Userdata 연동 로그인 지원
+#    6. [NEW] 데이터 독립성 확보: '나의 방제이력' 및 '나의 영농일지'에 로그인한 UserID 데이터만 필터링 출력
+#    7. [NEW] 방제이력 저장 시 UserID가 DBbangje 테이블에 함께 저장되도록 보강
 # ==========================================
 
 import streamlit as st
@@ -69,7 +68,7 @@ except Exception as e:
 if 'list_count' not in st.session_state: st.session_state.list_count = 5
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 if 'current_user' not in st.session_state: st.session_state.current_user = {}
-if 'active_menu' not in st.session_state: st.session_state.active_menu = "나의 영농일지"
+if 'active_menu' not in st.session_state: st.session_state.active_menu = "내가 필요한 농약 찾기"
 if 'form_reset_key' not in st.session_state: st.session_state.form_reset_key = 0
 if 'edit_post_id' not in st.session_state: st.session_state.edit_post_id = None
 if 'pest_uploader_key' not in st.session_state: st.session_state.pest_uploader_key = 0 
@@ -81,7 +80,6 @@ st.markdown("""
     <style>
     a.home-link { text-decoration: none !important; }
     
-    /* 스크롤바 두께 초대형 확대 (36px) 유지 */
     ::-webkit-scrollbar { width: 36px !important; height: 36px !important; }
     ::-webkit-scrollbar-track { background: #f1f1f1 !important; border-radius: 18px !important; box-shadow: inset 0 0 5px rgba(0,0,0,0.1) !important; }
     ::-webkit-scrollbar-thumb { background: #ffb74d !important; border-radius: 18px !important; border: 6px solid #f1f1f1 !important; }
@@ -90,50 +88,21 @@ st.markdown("""
     .hallabong-title { background-color: #e65100; padding: 15px; border-radius: 20px; text-align: center; color: white; font-weight: 900; font-size: 2.8rem; box-shadow: 0px 6px 15px rgba(230, 81, 0, 0.3); border: 3px solid #ffcc80; transition: transform 0.2s ease-in-out; margin-bottom: 10px; }
     .hallabong-title:hover { transform: scale(1.02); }
     
-    /* --- 라디오 버튼 공통 제어 --- */
     div[data-testid="stRadio"] div[role="radiogroup"] div[data-baseweb="radio"] div { display: none !important; }
     div[data-testid="stRadio"] div[role="radiogroup"] { display: flex; flex-direction: row; gap: 8px; }
     div[data-testid="stRadio"] div[role="radiogroup"] label { margin: 0 !important; cursor: pointer; transition: all 0.1s ease-in-out; }
 
-    /* 로그인/비회원 메뉴 (옵션 2개짜리) - 회색톤 & 최소 크기 */
-    div[data-testid="stRadio"]:has(label:nth-child(2)):not(:has(label:nth-child(3))) div[role="radiogroup"] { 
-        justify-content: flex-end; gap: 5px; 
-    }
-    div[data-testid="stRadio"]:has(label:nth-child(2)):not(:has(label:nth-child(3))) div[role="radiogroup"] label { 
-        background: linear-gradient(145deg, #eceff1, #cfd8dc) !important; 
-        border: 1px solid #b0bec5 !important; 
-        padding: 4px 10px !important; 
-        border-radius: 6px !important; 
-    }
-    div[data-testid="stRadio"]:has(label:nth-child(2)):not(:has(label:nth-child(3))) div[role="radiogroup"] label p { 
-        font-size: 13px !important; font-weight: 700 !important; color: #455a64 !important; margin: 0 !important; 
-    }
+    div[data-testid="stRadio"]:has(label:nth-child(2)):not(:has(label:nth-child(3))) div[role="radiogroup"] { justify-content: flex-end; gap: 5px; }
+    div[data-testid="stRadio"]:has(label:nth-child(2)):not(:has(label:nth-child(3))) div[role="radiogroup"] label { background: linear-gradient(145deg, #eceff1, #cfd8dc) !important; border: 1px solid #b0bec5 !important; padding: 4px 10px !important; border-radius: 6px !important; }
+    div[data-testid="stRadio"]:has(label:nth-child(2)):not(:has(label:nth-child(3))) div[role="radiogroup"] label p { font-size: 13px !important; font-weight: 700 !important; color: #455a64 !important; margin: 0 !important; }
     div[data-testid="stRadio"]:has(label:nth-child(2)):not(:has(label:nth-child(3))) div[role="radiogroup"] label:active, 
-    div[data-testid="stRadio"]:has(label:nth-child(2)):not(:has(label:nth-child(3))) div[role="radiogroup"] label:focus-within { 
-        background: linear-gradient(145deg, #cfd8dc, #b0bec5) !important; transform: translateY(2px) !important; 
-    }
+    div[data-testid="stRadio"]:has(label:nth-child(2)):not(:has(label:nth-child(3))) div[role="radiogroup"] label:focus-within { background: linear-gradient(145deg, #cfd8dc, #b0bec5) !important; transform: translateY(2px) !important; }
 
-    /* 8개 메인 메뉴 - 공간 부족 시 자동으로 2줄로 넘어가도록 wrap 적용 */
-    div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] { 
-        justify-content: center; 
-        flex-wrap: wrap !important; 
-        padding-bottom: 5px; margin-bottom: 15px; 
-    }
-    div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label { 
-        background: linear-gradient(145deg, #e8f5e9, #c8e6c9) !important; 
-        border: 2px solid #a5d6a7 !important; 
-        padding: 6px 8px !important; 
-        border-radius: 8px !important; 
-        flex: 1 1 auto; text-align: center; white-space: nowrap; 
-    }
-    div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label p { 
-        font-size: 13.5px !important; 
-        font-weight: 800 !important; color: #1b5e20 !important; margin: 0 !important; 
-    }
+    div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] { justify-content: center; flex-wrap: wrap !important; padding-bottom: 5px; margin-bottom: 15px; }
+    div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label { background: linear-gradient(145deg, #e8f5e9, #c8e6c9) !important; border: 2px solid #a5d6a7 !important; padding: 6px 8px !important; border-radius: 8px !important; flex: 1 1 auto; text-align: center; white-space: nowrap; }
+    div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label p { font-size: 13.5px !important; font-weight: 800 !important; color: #1b5e20 !important; margin: 0 !important; }
     div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label:active, 
-    div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label:focus-within { 
-        transform: translateY(3px) !important; background: linear-gradient(145deg, #c8e6c9, #a5d6a7) !important; 
-    }
+    div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label:focus-within { transform: translateY(3px) !important; background: linear-gradient(145deg, #c8e6c9, #a5d6a7) !important; }
 
     div[data-testid="stForm"], div[data-testid="stExpander"] { font-size: 18px !important; font-weight: 800 !important; }
     input[type="text"], input[type="password"], div[data-baseweb="select"] span, div[data-baseweb="select"] input, div[data-testid="stDateInput"] input, div[data-testid="stTimeInput"] input, textarea { font-size: 16px !important; padding: 6px 10px !important; }
@@ -238,10 +207,13 @@ def load_data_from_supabase():
     error_str = " | ".join(error_msgs) if error_msgs else ""
     return df_nongyak, df_moa, pesticide_list, pest_list, error_str
 
-def fetch_spray_history():
-    if not supabase_connected: return pd.DataFrame()
+# 💡 [필터링 핵심] 로그인한 사용자의 ID를 매개변수로 받아 본인 데이터만 가져옴
+@st.cache_data(ttl=60)
+def fetch_spray_history(user_id):
+    if not supabase_connected or not user_id: return pd.DataFrame()
     try:
-        response = supabase.table("DBbangje").select("*").order("Date", desc=True).execute()
+        # 로그인한 사용자의 기록만 조회되도록 .eq("UserID", user_id) 필터 추가
+        response = supabase.table("DBbangje").select("*").eq("UserID", user_id).order("Date", desc=True).execute()
         df = pd.DataFrame(response.data)
         if not df.empty:
             cols_map = {}
@@ -265,7 +237,9 @@ def fetch_spray_history():
 df_database, df_moa_db, pesticide_list, pest_list, db_error_msg = load_data_from_supabase()
 
 def render_styled_dataframe(df, grid_height=500):
-    df_hist = fetch_spray_history()
+    # 로그인한 사용자의 ID로 이력 가져오기
+    current_uid = st.session_state.current_user.get('id', 'guest') if st.session_state.logged_in else 'guest'
+    df_hist = fetch_spray_history(current_uid)
     
     history_dates_col = []
     history_names_col = []
@@ -538,23 +512,76 @@ st.markdown("<hr style='margin-top: 10px; margin-bottom: 15px;'>", unsafe_allow_
 # ==========================================
 # 🚀 본문 영역 분기 처리
 # ==========================================
+
+# 💡 [핵심] 로그인/회원가입 분리 탭 적용
 if st.session_state.get('login_mode') == "로그인" and not st.session_state.logged_in:
-    st.markdown("### 🔐 회원 로그인 및 가입")
-    with st.form("login_form"):
-        st.info("처음이신가요? 정보를 입력하시면 자동으로 가입 및 로그인 처리됩니다.")
-        name = st.text_input("성명 (또는 닉네임) *")
-        user_id = st.text_input("아이디 (ID) *")
-        password = st.text_input("비밀번호 (PW) *", type="password")
-        location = st.text_input("농장 소재지 (예: 제주시 조천읍)")
-        crop = st.text_input("재배작물 (예: 노지 감귤)")
-        
-        if st.form_submit_button("로그인 / 가입하기", type="primary"):
-            if user_id and password and name:
-                st.session_state.logged_in = True
-                st.session_state.current_user = {'name': name, 'id': user_id, 'location': location, 'crop': crop}
-                st.session_state.show_history_prompt = True
-                st.rerun()
-            else: st.error("성명, 아이디, 비밀번호는 필수 입력 항목 정리를 확인해 주세요.")
+    st.markdown("### 🔐 회원 접속")
+    tab_login, tab_register = st.tabs(["기존 회원 로그인", "신규 회원 가입"])
+    
+    with tab_login:
+        with st.form("login_only_form"):
+            st.info("가입하신 아이디와 비밀번호를 입력해주세요.")
+            log_id = st.text_input("아이디 (ID) *", key="log_id")
+            log_pw = st.text_input("비밀번호 (PW) *", type="password", key="log_pw")
+            
+            if st.form_submit_button("로그인", type="primary"):
+                if log_id and log_pw:
+                    try:
+                        res = supabase.table("DB_Userdata").select("*").eq("UserID", log_id).eq("Password", log_pw).execute()
+                        if res.data and len(res.data) > 0:
+                            user_info = res.data[0]
+                            st.session_state.logged_in = True
+                            st.session_state.current_user = {
+                                'id': user_info.get('UserID', log_id),
+                                'name': user_info.get('UserName', ''),
+                                'location': user_info.get('Location', ''),
+                                'crop': user_info.get('Crop', '')
+                            }
+                            st.success(f"환영합니다, {user_info.get('UserName', '')}님!")
+                            time.sleep(1)
+                            st.rerun()
+                        else:
+                            st.error("아이디 또는 비밀번호가 일치하지 않습니다.")
+                    except Exception as e:
+                        st.error(f"로그인 중 오류가 발생했습니다: {e}")
+                else:
+                    st.warning("아이디와 비밀번호를 모두 입력해주세요.")
+
+    with tab_register:
+        with st.form("register_form"):
+            st.info("처음이신가요? 정보를 입력하시면 가입됩니다.")
+            reg_id = st.text_input("새로운 아이디 (ID) *", key="reg_id")
+            reg_pw = st.text_input("새로운 비밀번호 (PW) *", type="password", key="reg_pw")
+            reg_name = st.text_input("성명 (또는 닉네임) *", key="reg_name")
+            reg_loc = st.text_input("농장 소재지 (예: 제주시 조천읍)", key="reg_loc")
+            reg_crop = st.text_input("재배작물 (예: 노지 감귤)", key="reg_crop")
+            
+            if st.form_submit_button("가입하기", type="primary"):
+                if reg_id and reg_pw and reg_name:
+                    try:
+                        check = supabase.table("DB_Userdata").select("UserID").eq("UserID", reg_id).execute()
+                        if check.data and len(check.data) > 0:
+                            st.error("이미 존재하는 아이디입니다. 다른 아이디를 사용해주세요.")
+                        else:
+                            new_user = {
+                                "UserID": reg_id,
+                                "Password": reg_pw,
+                                "UserName": reg_name,
+                                "Location": reg_loc,
+                                "Crop": reg_crop
+                            }
+                            supabase.table("DB_Userdata").insert(new_user).execute()
+                            st.session_state.logged_in = True
+                            st.session_state.current_user = {'id': reg_id, 'name': reg_name, 'location': reg_loc, 'crop': reg_crop}
+                            st.session_state.show_history_prompt = True
+                            st.success("가입이 완료되었습니다!")
+                            time.sleep(1)
+                            st.rerun()
+                    except Exception as e:
+                        st.error(f"가입 처리 중 오류 발생 (DB_Userdata 테이블 확인 필요): {e}")
+                else:
+                    st.warning("필수 항목(*표시)을 모두 입력해주세요.")
+
 else:
     if st.session_state.get('show_history_prompt', False):
         st.success("✅ 로그인이 완료되었습니다.")
@@ -766,7 +793,9 @@ else:
     elif menu == "나의 방제이력":
         st.subheader("📋 나의 방제이력 (방제 일지)")
         
-        df_history = fetch_spray_history()
+        # 💡 [핵심] 로그인한 사람의 UserID 넘기기
+        current_uid = st.session_state.current_user.get('id', 'guest') if st.session_state.logged_in else 'guest'
+        df_history = fetch_spray_history(current_uid)
         
         if df_history.empty: 
             st.info("아직 등록된 방제 이력이 없습니다. (아래에서 새로운 기록을 추가해보세요!)")
@@ -868,10 +897,12 @@ else:
                         try: qty_val = int(str(rec['qty']).replace(',', '').strip()) if str(rec['qty']).strip() else None
                         except: qty_val = None
                             
+                        # 💡 [핵심 보강] UserID 필드도 DBbangje 테이블에 명확히 저장되도록 추가
                         db_insert_data.append({
                             "ID": base_id + idx, "Date": dt_str, "Time": formatted_time_str, "Nongyak": rec['name'],
                             "Type": rec['type'], "Kijak": rec['moa'], "Spec": rec['size'], "Qty": qty_val,
-                            "Tqty": tqty_val, "Byung": rec['pest'], "Remark": h_memo
+                            "Tqty": tqty_val, "Byung": rec['pest'], "Remark": h_memo,
+                            "UserID": current_uid
                         })
                     
                     try:
@@ -881,7 +912,7 @@ else:
                         time.sleep(1.5)
                         st.rerun()
                     except Exception as e:
-                        st.error(f"🚨 저장 중 오류가 발생했습니다: {e}")
+                        st.error(f"🚨 저장 중 오류가 발생했습니다 (DBbangje에 UserID 컬럼이 존재하는지 확인해주세요): {e}")
             st.markdown("</div>", unsafe_allow_html=True)
 
     # ----------------------------------------
@@ -890,7 +921,8 @@ else:
     elif menu == "나의 영농일지":
         st.subheader("📓 나의 영농일지")
         
-        # 1. 상단: 새로운 영농일지 작성 영역 (💡 [핵심] 처음에 닫혀 있도록 expanded=False 처리)
+        current_uid = st.session_state.current_user.get('id', 'guest') if st.session_state.logged_in else 'guest'
+
         with st.expander("➕ 새로운 영농일지 작성 (이곳을 클릭하여 작성하세요)", expanded=False):
             with st.form("myilji_form", clear_on_submit=True):
                 col1, col2 = st.columns(2)
@@ -911,9 +943,7 @@ else:
                         st.warning("작업 내용을 입력해 주세요.")
                     else:
                         work_id = int(time.time())
-                        current_uid = st.session_state.current_user.get('id', 'guest') if st.session_state.logged_in else 'guest'
                         
-                        # 💡 [핵심] DB 컬럼명을 정확히 WorkContent 로 지정하여 에러 완벽 해결
                         ilji_data = {
                             "WorkID": work_id,
                             "UserID": current_uid,
@@ -955,14 +985,14 @@ else:
                         except Exception as e:
                             st.error(f"🚨 저장 중 오류가 발생했습니다. DB 테이블 컬럼명 불일치 또는 캐시 지연 현상입니다. (세부정보: {e})")
 
-        # 2. 하단: 기존 영농일지 목록
         st.markdown("<hr style='margin:20px 0;'>", unsafe_allow_html=True)
         st.markdown("#### 📖 나의 영농일지 기록")
         
         df_ilji = pd.DataFrame()
         if supabase_connected:
             try:
-                res_ilji = supabase.table("DB_Myilji").select("*").order("Nalja", desc=True).order("WorkID", desc=True).execute()
+                # 💡 [핵심] 로그인한 사용자의 ID로만 영농일지를 조회하도록 필터링 추가
+                res_ilji = supabase.table("DB_Myilji").select("*").eq("UserID", current_uid).order("Nalja", desc=True).order("WorkID", desc=True).execute()
                 df_ilji = pd.DataFrame(res_ilji.data)
             except Exception as e:
                 st.warning("⚠️ 영농일지 DB(DB_Myilji) 데이터를 불러오는 중 오류가 발생했습니다.")
@@ -972,7 +1002,6 @@ else:
         with list_container:
             if not df_ilji.empty:
                 for _, row in df_ilji.iterrows():
-                    # 💡 DB에서 데이터를 읽어올 때도 새 컬럼명(WorkContent)을 1순위로 탐색합니다.
                     w_id = row.get("WorkID", row.get("workid"))
                     d_date = row.get("Nalja", row.get("nalja", ""))
                     cat = row.get("Category", row.get("category", ""))
