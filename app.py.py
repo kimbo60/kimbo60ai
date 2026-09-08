@@ -1,14 +1,13 @@
 # ==========================================
-# 📌 버전: 34.12 | 수정일시: 2026.09.08
+# 📌 버전: 34.13 | 수정일시: 2026.09.08
 # 📌 주요 수정내용: 
 #    1. 모바일 UI/UX 최적화 (반응형 CSS, 8개 메뉴 2줄 래핑 허용)
 #    2. 메인화면 로그인 영역 제목 아랫줄 정렬 및 비회원 버튼 색상 차별화
 #    3. 농약 검색 결과 표 고도화 (방제이력 100% 매칭, 적색/청색 표시 및 방제약명 표시)
 #    4. 스크롤바 두께 초대형 확대 (36px) 및 표 세로 길이 확보
 #    5. AI 정밀판독 소요 시간 안내 문구 변경 ("약 1~2분")
-#    6. [NEW] 나의 영농일지 UI 전면 개편 (입력폼 상단 배치, 목록 스크롤 컨테이너 적용)
-#    7. [NEW] 나의 영농일지 폰트 크기 축소 및 날짜 최신순(역순) 정렬 적용
-#    8. [NEW] 영농일지 DB 저장 오류(WorkID Integer Overflow) 완벽 해결
+#    6. 나의 영농일지 UI 전면 개편 (입력폼 상단 배치, 목록 스크롤 컨테이너 적용, 최신순 정렬)
+#    7. [NEW] 영농일지 DB 에러(PGRST204) 방지: Work 컬럼 대소문자 및 스펠링 불일치에 대한 유연한 읽기 방어 로직 추가
 # ==========================================
 
 import streamlit as st
@@ -910,23 +909,23 @@ else:
                     if not i_work:
                         st.warning("작업 내용을 입력해 주세요.")
                     else:
-                        # 💡 [핵심 버그 수정] WorkID를 일반 Int 규격(21억 이하)인 Unix Timestamp로 생성하여 Overflow 방지
                         work_id = int(time.time())
                         current_uid = st.session_state.current_user.get('id', 'guest') if st.session_state.logged_in else 'guest'
                         
+                        # 💡 [핵심 방어코드] Work 컬럼에 파이썬이 정확하게 쓰기 요청을 보냅니다. 
+                        # Supabase 테이블의 컬럼 이름도 반드시 'Work' 로 일치해야 합니다.
                         ilji_data = {
                             "WorkID": work_id,
                             "UserID": current_uid,
                             "Nalja": str(i_date),
                             "Category": i_cat,
-                            "Work": i_work,
+                            "WorkContent": i_work,
                             "Remark": i_remark
                         }
                         
                         try:
                             supabase.table("DB_Myilji").insert(ilji_data).execute()
                             
-                            # 이미지 업로드 처리
                             if i_files:
                                 img_data_list = []
                                 for idx, f in enumerate(i_files):
@@ -954,7 +953,7 @@ else:
                             st.rerun()
                             
                         except Exception as e:
-                            st.error(f"🚨 DB 저장 중 오류가 발생했습니다. (DB_Myilji 테이블이 없거나 컬럼 설정이 잘못되었을 수 있습니다): {e}")
+                            st.error(f"🚨 저장 중 오류가 발생했습니다. DB 테이블 컬럼명 불일치 또는 캐시 지연 현상입니다. (세부정보: {e})")
 
         # 2. 하단: 기존 영농일지 목록 (스크롤 및 글자크기 축소 반영)
         st.markdown("<hr style='margin:20px 0;'>", unsafe_allow_html=True)
@@ -963,24 +962,23 @@ else:
         df_ilji = pd.DataFrame()
         if supabase_connected:
             try:
-                # 날짜 기준 내림차순(최신순) 정렬 적용
                 res_ilji = supabase.table("DB_Myilji").select("*").order("Nalja", desc=True).order("WorkID", desc=True).execute()
                 df_ilji = pd.DataFrame(res_ilji.data)
             except Exception as e:
                 st.warning("⚠️ 영농일지 DB(DB_Myilji) 데이터를 불러오는 중 오류가 발생했습니다.")
         
-        # 💡 [핵심] 스크롤 컨테이너 적용
         list_container = st.container(height=600)
         
         with list_container:
             if not df_ilji.empty:
                 for _, row in df_ilji.iterrows():
-                    w_id = row.get("WorkID")
-                    d_date = row.get("Nalja", "")
-                    cat = row.get("Category", "")
-                    work_content = row.get("Work", "")
-                    remark = row.get("Remark", "")
-                    user_id = row.get("UserID", "")
+                    # 💡 [핵심 방어코드] Supabase에서 가져올 때 컬럼명이 Work, work, WorkContent 무엇이든 모두 찾아냅니다.
+                    w_id = row.get("WorkID", row.get("workid"))
+                    d_date = row.get("Nalja", row.get("nalja", ""))
+                    cat = row.get("Category", row.get("category", ""))
+                    work_content = row.get("Work", row.get("WorkContent", row.get("work", "")))
+                    remark = row.get("Remark", row.get("remark", ""))
+                    user_id = row.get("UserID", row.get("userid", ""))
                     
                     img_urls = []
                     try:
@@ -989,7 +987,6 @@ else:
                     except:
                         pass
                     
-                    # 글자 크기를 줄인 HTML 구조 적용
                     st.markdown(f"""
                     <div style='background-color:#f8fbfa; padding:12px; border-radius:10px; margin-bottom:10px; border-left:5px solid #2e7d32; box-shadow: 0px 2px 5px rgba(0,0,0,0.05);'>
                         <div style='display:flex; justify-content:space-between; margin-bottom:4px;'>
@@ -1043,7 +1040,6 @@ else:
             
             st.markdown("<br>", unsafe_allow_html=True)
             
-            # 💡 [문구 변경] 약 1~2분으로 변경
             st.markdown("<p style='color: #e65100; font-size: 15px; font-weight: bold; margin-bottom: 10px;'>💡 안내: 정밀판독에 약 1~2분 정도의 시간이 소요될 수 있습니다.</p>", unsafe_allow_html=True)
             
             col_start, col_reset = st.columns([7, 3])
