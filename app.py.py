@@ -1,11 +1,10 @@
 # ==========================================
-# 📌 버전: 34.24 | 수정일시: 2026.09.18
+# 📌 버전: 34.25 | 수정일시: 2026.09.18
 # 📌 주요 수정내용: 
-#    1. 농약 검색 결과 표 고도화 (방제이력 매칭, 방제약명 표시)
-#    2. 관리자(admin) 권한 및 게시판 제어 기능 유지
-#    3. [완벽수정] CSS 호환성 오류(has 선택자) 제거: '비회원/로그인'은 순정(동그란 단추) 유지, 8개 메뉴만 사각형 버튼화
-#    4. [완벽수정] 모바일 접속 시 8개 메인 메뉴가 스크롤 없이 4개씩 2줄로 깔끔하게 정렬되도록 반응형 보강
-#    5. [완벽수정] '나의 영농일지' 표의 제목(헤더)이 우측으로 쏠리던 현상 수정 -> '가운데 정렬'로 통일
+#    1. 농약 검색 결과 표 고도화 및 게시판/영농일지/방제이력 기능 유지
+#    2. '비회원/로그인'은 순정(동그란 단추) 유지, 8개 메인 메뉴만 사각형 버튼 적용
+#    3. 영농일지 표 제목(헤더) 가운데 정렬 및 텍스트 자동 줄바꿈 유지
+#    4. [핵심수정] 모바일 반응형 CSS 전면 개편: 휴대폰 화면에서 8개 메인 메뉴가 좌우 잘림 없이 크기가 알맞게 줄어들며 '정확히 4개씩 2줄'로 완벽 정렬되도록 개선
 # ==========================================
 
 import streamlit as st
@@ -88,37 +87,56 @@ st.markdown("""
     .hallabong-title:hover { transform: scale(1.02); }
     
     /* =========================================================
-       💡 [완벽 복구] 8개 메뉴는 사각형, 로그인 메뉴는 기본 동그라미 단추
-       (모든 기기 호환성을 위해 위치 기반으로 CSS 완벽 분리)
+       💡 [메인 메뉴 8개] PC 및 기본 사각형 버튼 스타일
        ========================================================= */
-       
-    /* 1. 기본적으로 화면에 있는 모든 라디오 버튼을 사각형 버튼(Pill) 형태로 변환 */
-    div[data-testid="stRadio"] div[role="radiogroup"] label > div:first-child,
-    div[data-testid="stRadio"] div[role="radiogroup"] label input { 
-        display: none !important; /* 동그라미 마커 강제 삭제 */
+    div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label input[type="radio"],
+    div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label div[data-baseweb="radio"],
+    div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label > div:first-child { 
+        display: none !important; 
     }
-    div[data-testid="stRadio"] div[role="radiogroup"] { 
-        display: flex; flex-direction: row; gap: 8px; flex-wrap: wrap; justify-content: center; margin-bottom: 15px; 
+    
+    div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] { 
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: wrap !important; 
+        justify-content: center !important; 
+        gap: 8px !important;
+        margin-bottom: 15px !important; 
     }
-    div[data-testid="stRadio"] div[role="radiogroup"] label { 
+    
+    div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label { 
         background: linear-gradient(145deg, #e8f5e9, #c8e6c9) !important; 
         border: 2px solid #a5d6a7 !important; 
-        padding: 8px 10px !important; 
+        padding: 8px 12px !important; 
         border-radius: 10px !important; 
-        margin: 0 !important; cursor: pointer; flex: 1 1 auto; text-align: center;
-        transition: all 0.2s ease-in-out;
+        flex: 1 1 auto !important; 
+        text-align: center !important; 
+        white-space: nowrap !important; 
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
+        cursor: pointer !important;
+        margin: 0 !important;
+        transition: all 0.2s ease-in-out !important;
     }
-    div[data-testid="stRadio"] div[role="radiogroup"] label p { 
-        font-size: 14.5px !important; font-weight: 800 !important; color: #1b5e20 !important; margin: 0 !important; 
+    
+    div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label p { 
+        font-size: 14.5px !important; 
+        font-weight: 800 !important; 
+        color: #1b5e20 !important; 
+        margin: 0 !important; 
     }
-    /* 사각형 버튼 선택 시 눌림 효과 */
-    div[data-testid="stRadio"] div[role="radiogroup"] label[data-checked="true"],
-    div[data-testid="stRadio"] div[role="radiogroup"] label[aria-checked="true"] { 
-        background: linear-gradient(145deg, #c8e6c9, #a5d6a7) !important; border-color: #4caf50 !important; 
-        transform: translateY(3px) !important; box-shadow: inset 0px 3px 6px rgba(0,0,0,0.15) !important;
+    
+    div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label[data-checked="true"],
+    div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label:has(input:checked),
+    div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label[aria-checked="true"] { 
+        background: linear-gradient(145deg, #c8e6c9, #a5d6a7) !important; 
+        border-color: #4caf50 !important; 
+        transform: translateY(3px) !important; 
+        box-shadow: inset 0px 3px 6px rgba(0,0,0,0.15) !important;
     }
 
-    /* 2. 로그인 메뉴(우측 상단 로고 옆 컬럼 내부)는 동그란 '순정 단추' 형태로 강제 예외 처리 복구 */
+    /* 로그인/비회원 메뉴 (순정 단추 유지) */
     div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-of-type(2) div[data-testid="stRadio"] div[role="radiogroup"] {
         justify-content: flex-end !important; margin-bottom: 0 !important; gap: 15px !important; display: flex !important;
     }
@@ -126,7 +144,6 @@ st.markdown("""
         background: transparent !important; border: none !important; padding: 0 !important; border-radius: 0 !important; 
         flex: 0 1 auto !important; box-shadow: none !important; transform: none !important;
     }
-    /* 로그인 메뉴 동그라미 다시 보이기 */
     div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-of-type(2) div[data-testid="stRadio"] div[role="radiogroup"] label > div:first-child,
     div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-of-type(2) div[data-testid="stRadio"] div[role="radiogroup"] label input {
         display: inline-flex !important; 
@@ -165,24 +182,42 @@ st.markdown("""
     .search-header-result { background: linear-gradient(to right, #e3f2fd, transparent); padding: 15px 20px; border-left: 5px solid #2196f3; border-radius: 8px; margin-bottom: 15px; }
     .search-header-result h3 { margin:0; color:#1565c0; }
 
-    /* 💡 모바일 화면 최적화: 8개 메인 메뉴 4개씩 2줄 정렬 */
+    /* =========================================================
+       💡 [모바일 반응형 완벽 보강] 
+       휴대폰 화면(768px 이하)에서 좌우 잘림 방지 및 4개씩 2줄 격자 정렬
+       ========================================================= */
     @media screen and (max-width: 768px) {
-        .hallabong-title { font-size: 1.8rem !important; padding: 10px !important; border-radius: 15px !important; }
-        .hallabong-title img { width: 45px !important; margin-right: 10px !important; }
+        .hallabong-title { font-size: 1.6rem !important; padding: 10px !important; border-radius: 12px !important; }
+        .hallabong-title img { width: 38px !important; margin-right: 8px !important; }
         
-        /* 모바일에서는 메인 영역 라디오 버튼만 4x2 격자 형태 적용 */
-        div[data-testid="stRadio"] div[role="radiogroup"] { 
-            display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px !important; 
+        /* 8개 메인 메뉴를 휴대폰 화면 폭에 딱 맞춰 4개씩 2줄(Grid)로 정렬하고 크기 축소 */
+        div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] { 
+            display: grid !important; 
+            grid-template-columns: repeat(4, 1fr) !important; 
+            gap: 4px !important; 
+            width: 100% !important;
+            box-sizing: border-box !important;
         }
-        /* 로그인 버튼 영역은 격자 제외 및 우측 정렬 유지 */
+        div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label { 
+            padding: 6px 2px !important; 
+            border-radius: 6px !important;
+            white-space: normal !important; 
+            min-width: 0 !important;
+        }
+        div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label p { 
+            font-size: 11px !important; 
+            line-height: 1.2 !important;
+            word-break: keep-all !important;
+            text-align: center !important;
+        }
+        
+        /* 로그인 버튼 영역 유지 */
         div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-of-type(2) div[data-testid="stRadio"] div[role="radiogroup"] {
-            display: flex !important;
+            display: flex !important; justify-content: flex-end !important;
         }
-        div[data-testid="stRadio"] div[role="radiogroup"] label { padding: 8px 4px !important; white-space: normal !important; }
-        div[data-testid="stRadio"] div[role="radiogroup"] label p { font-size: 11.5px !important; line-height: 1.3 !important; word-break: keep-all !important; }
         
-        .card-weather { font-size: 1.05rem !important; }
-        .login-spacer { height: 5px !important; } 
+        .card-weather { font-size: 1rem !important; }
+        .login-spacer { height: 2px !important; } 
     }
     </style>
 """, unsafe_allow_html=True)
@@ -1080,18 +1115,18 @@ else:
                 
             df_display = pd.DataFrame(display_ilji_list)
             
-            # 💡 [핵심] 줄바꿈 기호를 HTML의 <br> 태그로 변환
             df_display['작업내용'] = df_display['작업내용'].astype(str).str.replace(r'\n', '<br>', regex=True)
             df_display['참고사항'] = df_display['참고사항'].astype(str).str.replace(r'\n', '<br>', regex=True)
             
-            # 💡 [핵심] 마크다운 깨짐 방지 및 제목 텍스트 가운데 정렬 적용 (text-align: center !important;)
+            # 💡 [핵심수정] 표의 모든 헤더(th)와 셀(td)을 완벽하게 '가운데 정렬(text-align: center)'로 고정
             table_css = """
             <style>
             .custom-ilji-table { width: 100%; border-collapse: collapse; font-size: 14.5px; text-align: center; font-family: inherit; margin: 0; }
             .custom-ilji-table th { background-color: #f1f8e9; padding: 12px; border: 1px solid #c8e6c9; color: #2e7d32; font-weight: bold; position: sticky; top: 0; z-index: 1; white-space: nowrap; text-align: center !important; }
-            .custom-ilji-table td { padding: 12px 10px; border: 1px solid #e0e0e0; vertical-align: top; }
+            .custom-ilji-table td { padding: 12px 10px; border: 1px solid #e0e0e0; vertical-align: middle; text-align: center !important; }
+            /* 단, 내용이 긴 작업내용과 참고사항은 가독성을 위해 왼쪽 정렬 유지 및 줄바꿈 적용 */
             .custom-ilji-table td:nth-child(3), .custom-ilji-table td:nth-child(4) { 
-                text-align: left; 
+                text-align: left !important; 
                 white-space: normal !important; 
                 word-wrap: break-word; 
                 line-height: 1.6; 
@@ -1112,7 +1147,6 @@ else:
             """
             st.markdown(final_html, unsafe_allow_html=True)
             
-            # 첨부 사진 모아보기 영역
             if img_dict:
                 st.markdown("<br>#### 📸 첨부 사진 모아보기", unsafe_allow_html=True)
                 st.markdown("<p style='font-size:14px; color:gray; margin-top:-5px;'>위 표에서 '사진(장)' 숫자가 있는 작업의 사진을 골라서 볼 수 있습니다.</p>", unsafe_allow_html=True)
