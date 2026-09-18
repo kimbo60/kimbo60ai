@@ -1,12 +1,11 @@
 # ==========================================
-# 📌 버전: 34.21 | 수정일시: 2026.09.18
+# 📌 버전: 34.22 | 수정일시: 2026.09.18
 # 📌 주요 수정내용: 
-#    1. 모바일 UI/UX 최적화 및 36px 대형 스크롤바 유지
-#    2. 농약 검색 결과 표 고도화 (방제이력 매칭, 방제약명 표시)
-#    3. 관리자(admin) 권한 및 게시판 제어 기능 유지
-#    4. [핵심수정] 메뉴 CSS 완전 재설계: 동그란 라디오 마커(단추) 100% 강제 삭제 및 사각형 버튼 완벽 복원
-#    5. [핵심수정] '나의 영농일지' 화면을 방제이력과 동일한 표(Dataframe) 형태로 전면 개편
-#    6. [NEW] 표(Dataframe) 하단에 '첨부 사진 모아보기' 선택 박스 추가
+#    1. 농약 검색 결과 표 고도화 (방제이력 매칭, 방제약명 표시)
+#    2. 관리자(admin) 권한 및 게시판 제어 기능 유지
+#    3. [핵심수정] '비회원/로그인' 메뉴는 원래의 동그란 단추 형태(순정)로 완벽 원상 복구
+#    4. [핵심수정] 모바일 접속 시 메인 메뉴 8개가 스크롤 없이 '정확히 4개씩 2줄'로 예쁘게 정렬되도록 CSS Grid 적용
+#    5. [핵심수정] '나의 영농일지' 목록을 Dataframe 대신 고급 HTML 표로 전환하여 글자가 잘리지 않고 '여러 줄로 자동 줄바꿈' 되도록 완벽 구현
 # ==========================================
 
 import streamlit as st
@@ -89,57 +88,64 @@ st.markdown("""
     .hallabong-title:hover { transform: scale(1.02); }
     
     /* =========================================================
-       💡 [완벽 복구] 모든 라디오 마커(동그라미 단추) 100% 강제 숨김 및 사각형 버튼화
+       💡 [완벽 복구] 8개 메인 메뉴에만 사각형 디자인 적용
+       (비회원/로그인은 CSS 제외시켜 원상복구)
        ========================================================= */
        
-    /* 1. 보기 싫은 동그라미 단추를 찾아낼 수 있는 모든 경로를 원천 차단 */
-    div[data-testid="stRadio"] div[role="radiogroup"] label input[type="radio"] { display: none !important; }
-    div[data-testid="stRadio"] div[role="radiogroup"] label div[data-baseweb="radio"] { display: none !important; }
-    div[data-testid="stRadio"] div[role="radiogroup"] label > div:first-child { display: none !important; }
-    
-    /* 2. 공통 버튼 레이아웃 속성 */
-    div[data-testid="stRadio"] div[role="radiogroup"] { 
-        display: flex !important; flex-direction: row !important; gap: 8px !important; flex-wrap: wrap !important; 
+    /* 8개 메뉴를 가진 라디오 그룹 선택 -> 보기 싫은 동그라미 단추 숨김 */
+    div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label > div:first-child,
+    div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label input { 
+        display: none !important; 
     }
-    div[data-testid="stRadio"] div[role="radiogroup"] label { 
-        margin: 0 !important; cursor: pointer !important; transition: all 0.2s ease-in-out !important; 
+    
+    /* 8개 메인 메뉴 PC 레이아웃 설정 (1줄 정렬) */
+    div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] { 
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important; 
+        justify-content: center !important; 
+        gap: 8px !important;
+        margin-bottom: 15px !important; 
+    }
+    
+    /* 8개 메인 메뉴 사각형 버튼 스타일 적용 */
+    div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label { 
+        background: linear-gradient(145deg, #e8f5e9, #c8e6c9) !important; 
+        border: 2px solid #a5d6a7 !important; 
+        padding: 8px 10px !important; 
+        border-radius: 10px !important; 
+        flex: 1 1 auto !important; 
+        text-align: center !important; 
+        white-space: nowrap !important; 
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
+        cursor: pointer !important;
+        margin: 0 !important;
+        transition: all 0.2s ease-in-out !important;
+    }
+    div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label p { 
+        font-size: 14.5px !important; 
+        font-weight: 800 !important; 
+        color: #1b5e20 !important; 
+        margin: 0 !important; 
+    }
+    /* 메인 메뉴 선택 시 눌림 효과 */
+    div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label[data-checked="true"],
+    div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label:has(input:checked),
+    div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label[aria-checked="true"] { 
+        background: linear-gradient(145deg, #c8e6c9, #a5d6a7) !important; 
+        border-color: #4caf50 !important; 
+        transform: translateY(3px) !important; 
+        box-shadow: inset 0px 3px 6px rgba(0,0,0,0.15) !important;
     }
 
-    /* 3. 로그인/비회원 메뉴 (옵션 2개 이하) -> 회색 사각형 버튼 */
+    /* 로그인/비회원 메뉴 위치 조정 (기본 단추 유지) */
     div[data-testid="stRadio"]:not(:has(label:nth-child(3))) div[role="radiogroup"] { 
-        justify-content: flex-end !important; gap: 5px !important; 
-    }
-    div[data-testid="stRadio"]:not(:has(label:nth-child(3))) div[role="radiogroup"] label { 
-        background: linear-gradient(145deg, #eceff1, #cfd8dc) !important; 
-        border: 1px solid #b0bec5 !important; padding: 6px 14px !important; border-radius: 8px !important; 
+        justify-content: flex-end; gap: 15px; margin-top: 5px;
     }
     div[data-testid="stRadio"]:not(:has(label:nth-child(3))) div[role="radiogroup"] label p { 
-        font-size: 14px !important; font-weight: 700 !important; color: #455a64 !important; margin: 0 !important; 
-    }
-    div[data-testid="stRadio"]:not(:has(label:nth-child(3))) div[role="radiogroup"] label[data-checked="true"],
-    div[data-testid="stRadio"]:not(:has(label:nth-child(3))) div[role="radiogroup"] label:has(input:checked),
-    div[data-testid="stRadio"]:not(:has(label:nth-child(3))) div[role="radiogroup"] label[aria-checked="true"] { 
-        background: linear-gradient(145deg, #cfd8dc, #b0bec5) !important; border-color: #78909c !important; 
-        transform: translateY(2px) !important; box-shadow: inset 0px 2px 4px rgba(0,0,0,0.1) !important; 
-    }
-
-    /* 4. 8개 메인 메뉴 (옵션 3개 이상) -> 초록색 사각형 버튼 */
-    div[data-testid="stRadio"]:has(label:nth-child(3)) div[role="radiogroup"] { 
-        justify-content: center !important; padding-bottom: 5px !important; margin-bottom: 15px !important; 
-    }
-    div[data-testid="stRadio"]:has(label:nth-child(3)) div[role="radiogroup"] label { 
-        background: linear-gradient(145deg, #e8f5e9, #c8e6c9) !important; 
-        border: 2px solid #a5d6a7 !important; padding: 8px 12px !important; border-radius: 10px !important; 
-        flex: 1 1 auto !important; text-align: center !important; white-space: nowrap !important; 
-    }
-    div[data-testid="stRadio"]:has(label:nth-child(3)) div[role="radiogroup"] label p { 
-        font-size: 14.5px !important; font-weight: 800 !important; color: #1b5e20 !important; margin: 0 !important; 
-    }
-    div[data-testid="stRadio"]:has(label:nth-child(3)) div[role="radiogroup"] label[data-checked="true"],
-    div[data-testid="stRadio"]:has(label:nth-child(3)) div[role="radiogroup"] label:has(input:checked),
-    div[data-testid="stRadio"]:has(label:nth-child(3)) div[role="radiogroup"] label[aria-checked="true"] { 
-        background: linear-gradient(145deg, #c8e6c9, #a5d6a7) !important; border-color: #4caf50 !important; 
-        transform: translateY(3px) !important; box-shadow: inset 0px 2px 4px rgba(0,0,0,0.15) !important; 
+        font-weight: 600 !important; color: #455a64 !important; 
     }
 
     /* 기타 기본 디자인 설정 */
@@ -172,12 +178,26 @@ st.markdown("""
     .search-header-result { background: linear-gradient(to right, #e3f2fd, transparent); padding: 15px 20px; border-left: 5px solid #2196f3; border-radius: 8px; margin-bottom: 15px; }
     .search-header-result h3 { margin:0; color:#1565c0; }
 
-    /* 모바일 반응형 최적화 코드 */
+    /* 💡 [핵심] 모바일 화면(스마트폰)에서 메뉴를 2줄로 강제 정렬 (Grid 적용) */
     @media screen and (max-width: 768px) {
         .hallabong-title { font-size: 1.8rem !important; padding: 10px !important; border-radius: 15px !important; }
         .hallabong-title img { width: 45px !important; margin-right: 10px !important; }
-        div[data-testid="stRadio"]:has(label:nth-child(3)) div[role="radiogroup"] label p { font-size: 12.5px !important; }
-        div[data-testid="stRadio"]:has(label:nth-child(3)) div[role="radiogroup"] label { padding: 8px 10px !important; }
+        
+        div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] { 
+            display: grid !important; 
+            grid-template-columns: repeat(4, 1fr) !important; /* 4개씩 2줄 */
+            gap: 6px !important; 
+        }
+        div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label { 
+            padding: 8px 4px !important; 
+            border-radius: 8px !important;
+            white-space: normal !important; /* 글자 줄바꿈 허용 */
+        }
+        div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label p { 
+            font-size: 11.5px !important; /* 좁은 화면을 위한 작은 글씨 */
+            line-height: 1.3 !important;
+            word-break: keep-all !important;
+        }
         .card-weather { font-size: 1.05rem !important; }
         .login-spacer { height: 5px !important; } 
     }
@@ -963,7 +983,7 @@ else:
             st.markdown("</div>", unsafe_allow_html=True)
 
     # ----------------------------------------
-    # 메뉴 5.1: 나의 영농일지 (NEW - 전면 개편)
+    # 메뉴 5.1: 나의 영농일지
     # ----------------------------------------
     elif menu == "나의 영농일지":
         st.subheader("📓 나의 영농일지")
@@ -1035,7 +1055,7 @@ else:
         st.markdown("<hr style='margin:20px 0;'>", unsafe_allow_html=True)
         st.markdown("#### 📖 나의 영농일지 기록")
         
-        # 💡 [핵심] 영농일지를 방제이력과 동일한 표(Dataframe) 형태로 보여주는 로직
+        # 💡 [핵심] 영농일지 목록을 방제이력과 똑같은 디자인의 '고급 HTML 표'로 전환
         df_ilji = pd.DataFrame()
         if supabase_connected:
             try:
@@ -1046,7 +1066,7 @@ else:
         
         if not df_ilji.empty:
             display_ilji_list = []
-            img_dict = {} # 💡 표 아래에서 선택한 사진을 보여주기 위한 딕셔너리
+            img_dict = {} 
             
             for _, row in df_ilji.iterrows():
                 w_id = row.get("WorkID", row.get("workid"))
@@ -1055,7 +1075,6 @@ else:
                 work_content = row.get("WorkContent", row.get("Work", row.get("work", "")))
                 remark = row.get("Remark", row.get("remark", ""))
                 
-                # 사진 첨부 확인
                 img_urls = []
                 try:
                     res_img = supabase.table("DB_Image").select("ImageURL").eq("RefID", str(w_id)).eq("Category", "Myilji").execute()
@@ -1074,24 +1093,40 @@ else:
                     "작업분류": cat,
                     "작업내용": work_content,
                     "참고사항": remark,
-                    "사진(장)": img_count
+                    "사진(장)": f"📷 {img_count}장" if img_count > 0 else "-"
                 })
                 
             df_display = pd.DataFrame(display_ilji_list)
             
-            # 표 디자인 적용 (방제이력 표와 동일한 스타일)
-            styled_ilji = df_display.style.set_properties(**{'font-size': '14.5px', 'text-align': 'center'})
-            styled_ilji = styled_ilji.set_properties(subset=['작업내용', '참고사항'], **{'text-align': 'left'})
+            # 💡 [핵심] 글자 잘림(Truncation) 방지를 위한 강력한 CSS 및 HTML 표 렌더링
+            table_css = """
+            <style>
+            .custom-ilji-table { width: 100%; border-collapse: collapse; font-size: 14.5px; text-align: center; font-family: inherit; }
+            .custom-ilji-table th { background-color: #f1f8e9; padding: 12px; border: 1px solid #c8e6c9; color: #2e7d32; font-weight: bold; position: sticky; top: 0; z-index: 1; white-space: nowrap; }
+            .custom-ilji-table td { padding: 12px 10px; border: 1px solid #e0e0e0; vertical-align: middle; }
+            .custom-ilji-table td:nth-child(3), .custom-ilji-table td:nth-child(4) { 
+                text-align: left; 
+                white-space: pre-wrap !important; /* 자동 줄바꿈 강제 적용 */
+                word-break: break-all; 
+                line-height: 1.5; 
+            }
+            .custom-ilji-table tr:nth-child(even) { background-color: #fcfcfc; }
+            .custom-ilji-table tr:hover { background-color: #f1f8e9; }
+            </style>
+            """
+            table_html = df_display.to_html(index=False, escape=False, classes="custom-ilji-table")
             
-            # Dataframe 렌더링
-            st.dataframe(styled_ilji, hide_index=True, use_container_width=True, height=500)
+            # 표를 500px 고정 스크롤 영역에 담아서 출력
+            list_container = st.container(height=500)
+            with list_container:
+                st.markdown(table_css + f"<div style='overflow-x: auto;'>{table_html}</div>", unsafe_allow_html=True)
             
-            # 💡 첨부된 사진이 있을 경우 표 아래에 사진 모아보기 메뉴 제공
+            # 첨부 사진 모아보기 영역
             if img_dict:
                 st.markdown("<br>#### 📸 첨부 사진 모아보기", unsafe_allow_html=True)
                 st.markdown("<p style='font-size:14px; color:gray; margin-top:-5px;'>위 표에서 '사진(장)' 숫자가 있는 작업의 사진을 골라서 볼 수 있습니다.</p>", unsafe_allow_html=True)
                 
-                selected_log = st.selectbox("사진을 확인할 일자 및 작업을 선택하세요:", options=["선택 안 함"] + list(img_dict.keys()))
+                selected_log = st.selectbox("사진을 확인할 일자 및 작업을 선택하세요:", options=["선택 안 함"] + list(img_dict.keys()), label_visibility="collapsed")
                 
                 if selected_log != "선택 안 함":
                     urls = img_dict[selected_log]
