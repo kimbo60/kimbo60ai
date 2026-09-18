@@ -1,12 +1,12 @@
 # ==========================================
-# 📌 버전: 34.19 | 수정일시: 2026.09.18
+# 📌 버전: 34.20 | 수정일시: 2026.09.18
 # 📌 주요 수정내용: 
 #    1. 모바일 UI/UX 최적화 및 36px 대형 스크롤바 유지
 #    2. 농약 검색 결과 표 고도화 (방제이력 매칭, 방제약명 표시)
-#    3. 영농일지 카테고리 추가 및 DB_Myilji 연동 완벽 방어
+#    3. 영농일지 카테고리 추가 및 DB_Myilji 연동
 #    4. 최고관리자(admin) 하드코딩 로그인 및 게시판 권한 제어
-#    5. [핵심수정] 메인 메뉴 및 로그인 메뉴 CSS 완전 재설계 (동그란 라디오 마커 강제 삭제)
-#    6. [핵심수정] 8개 메인 메뉴를 모바일 반응형 '사각형 탭 버튼' 디자인으로 완벽 복원
+#    5. [핵심수정] '비회원/로그인'은 기본 단추 형태(순정)로 제외하고 원상 복구
+#    6. [핵심수정] 8개 메인 메뉴만 추적하여 동그란 라디오 마커를 완벽 강제 삭제하고 사각형 버튼 디자인으로 환원
 # ==========================================
 
 import streamlit as st
@@ -79,7 +79,7 @@ st.markdown("""
     <style>
     a.home-link { text-decoration: none !important; }
     
-    /* 스크롤바 두께 대형 확대 (36px) */
+    /* 스크롤바 두께 대형 확대 (36px) 유지 */
     ::-webkit-scrollbar { width: 36px !important; height: 36px !important; }
     ::-webkit-scrollbar-track { background: #f1f1f1 !important; border-radius: 18px !important; box-shadow: inset 0 0 5px rgba(0,0,0,0.1) !important; }
     ::-webkit-scrollbar-thumb { background: #ffb74d !important; border-radius: 18px !important; border: 6px solid #f1f1f1 !important; }
@@ -89,81 +89,57 @@ st.markdown("""
     .hallabong-title:hover { transform: scale(1.02); }
     
     /* =========================================================
-       💡 [완벽 복구] 라디오 버튼 숨김 및 사각형 버튼 디자인 CSS
+       💡 [완벽 복구] 8개 메인 메뉴 전용 사각형 버튼 디자인 CSS 
+       (로그인 2개 메뉴는 전혀 건드리지 않아 기본 단추 형태 유지)
        ========================================================= */
        
-    /* 1. 기본 라디오 마커(동그라미) 100% 강제 숨김 처리 */
-    div[data-testid="stRadio"] div[role="radiogroup"] label > div:first-child {
-        display: none !important;
+    /* 1. 8개 메뉴를 가진 라디오 그룹 선택 -> 보기 싫은 동그라미 단추 완벽 강제 숨김 */
+    div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label > div:first-child,
+    div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label input { 
+        display: none !important; 
     }
     
-    /* 버튼 컨테이너 기본 속성 */
-    div[data-testid="stRadio"] div[role="radiogroup"] { 
-        display: flex; 
-        flex-direction: row; 
-        gap: 10px !important; 
-    }
-    div[data-testid="stRadio"] div[role="radiogroup"] label { 
-        margin: 0 !important; 
-        cursor: pointer; 
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: all 0.2s ease-in-out; 
-    }
-
-    /* 2. 로그인/비회원 메뉴 (옵션 2개) - 회색/블루그레이 사각형 버튼 */
-    div[data-testid="stRadio"]:has(label:nth-child(2)):not(:has(label:nth-child(3))) div[role="radiogroup"] { 
-        justify-content: flex-end; 
-    }
-    div[data-testid="stRadio"]:has(label:nth-child(2)):not(:has(label:nth-child(3))) div[role="radiogroup"] label { 
-        background-color: #eceff1 !important; 
-        border: 1px solid #b0bec5 !important; 
-        padding: 6px 14px !important; 
-        border-radius: 8px !important; 
-    }
-    div[data-testid="stRadio"]:has(label:nth-child(2)):not(:has(label:nth-child(3))) div[role="radiogroup"] label p { 
-        font-size: 13px !important; 
-        font-weight: 700 !important; 
-        color: #455a64 !important; 
-        margin: 0 !important; 
-    }
-    /* 로그인 메뉴 선택 시 스타일 */
-    div[data-testid="stRadio"]:has(label:nth-child(2)):not(:has(label:nth-child(3))) div[role="radiogroup"] label:has(div[data-checked="true"]) { 
-        background-color: #cfd8dc !important; 
-        border-color: #78909c !important; 
-        transform: translateY(2px) !important;
-        box-shadow: inset 0px 2px 4px rgba(0,0,0,0.1);
-    }
-
-    /* 3. 8개 메인 메뉴 - 초록색 사각형 버튼 */
+    /* 2. 8개 메인 메뉴 레이아웃 설정 */
     div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] { 
-        justify-content: center; 
+        display: flex !important;
+        flex-direction: row !important;
         flex-wrap: wrap !important; 
-        padding-bottom: 5px; 
-        margin-bottom: 15px; 
+        justify-content: center !important; 
+        gap: 10px !important;
+        margin-bottom: 15px !important; 
     }
+    
+    /* 3. 8개 메인 메뉴 사각형 버튼 스타일 적용 */
     div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label { 
-        background-color: #f1f8e9 !important; 
+        background: linear-gradient(145deg, #e8f5e9, #c8e6c9) !important; 
         border: 2px solid #a5d6a7 !important; 
-        padding: 8px 12px !important; 
-        border-radius: 8px !important; 
+        padding: 10px 16px !important; 
+        border-radius: 12px !important; 
         flex: 1 1 auto; 
         text-align: center; 
         white-space: nowrap; 
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        cursor: pointer;
+        margin: 0 !important;
+        transition: all 0.2s ease-in-out;
     }
+    
     div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label p { 
-        font-size: 14px !important; 
+        font-size: 15px !important; 
         font-weight: 800 !important; 
         color: #1b5e20 !important; 
         margin: 0 !important; 
     }
-    /* 메인 메뉴 선택 시 스타일 */
-    div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label:has(div[data-checked="true"]) { 
-        background-color: #c8e6c9 !important; 
+    
+    /* 4. 선택된 버튼 눌림 효과 */
+    div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label[data-checked="true"],
+    div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label:active { 
+        background: linear-gradient(145deg, #c8e6c9, #a5d6a7) !important; 
         border-color: #4caf50 !important; 
         transform: translateY(3px) !important; 
-        box-shadow: 0px 3px 6px rgba(76, 175, 80, 0.4);
+        box-shadow: inset 0px 3px 6px rgba(0,0,0,0.15) !important;
     }
 
     /* 기타 기본 디자인 설정 */
@@ -200,7 +176,8 @@ st.markdown("""
     @media screen and (max-width: 768px) {
         .hallabong-title { font-size: 1.8rem !important; padding: 10px !important; border-radius: 15px !important; }
         .hallabong-title img { width: 45px !important; margin-right: 10px !important; }
-        div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label p { font-size: 12.5px !important; }
+        div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label p { font-size: 13px !important; }
+        div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label { padding: 8px 10px !important; }
         .card-weather { font-size: 1.05rem !important; }
         .login-spacer { height: 5px !important; } 
     }
