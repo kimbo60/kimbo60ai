@@ -1,13 +1,12 @@
 # ==========================================
-# 📌 버전: 34.18 | 수정일시: 2026.09.18
+# 📌 버전: 34.19 | 수정일시: 2026.09.18
 # 📌 주요 수정내용: 
-#    1. 모바일 UI/UX 최적화 (반응형 CSS, 메뉴 2줄 래핑)
+#    1. 모바일 UI/UX 최적화 및 36px 대형 스크롤바 유지
 #    2. 농약 검색 결과 표 고도화 (방제이력 매칭, 방제약명 표시)
-#    3. 영농일지 카테고리(적과, 수확 추가), UI 개편, DB 에러 완벽 방어
-#    4. 로그인/회원가입 분리 및 DB_Userdata 연동 (admin 관리자 권한 지원)
-#    5. 게시판(정보교환마당) 본인 및 관리자 수정/삭제, 답변 작성 지원
-#    6. [NEW] CSS 충돌 버그 완벽 해결: 라디오 버튼(단추 형태)으로 풀려버린 현상 수정
-#    7. [NEW] 메인 메뉴 및 로그인 메뉴를 원래의 '사각형 버튼(Pill)' 형태로 완벽 복구
+#    3. 영농일지 카테고리 추가 및 DB_Myilji 연동 완벽 방어
+#    4. 최고관리자(admin) 하드코딩 로그인 및 게시판 권한 제어
+#    5. [핵심수정] 메인 메뉴 및 로그인 메뉴 CSS 완전 재설계 (동그란 라디오 마커 강제 삭제)
+#    6. [핵심수정] 8개 메인 메뉴를 모바일 반응형 '사각형 탭 버튼' 디자인으로 완벽 복원
 # ==========================================
 
 import streamlit as st
@@ -80,7 +79,7 @@ st.markdown("""
     <style>
     a.home-link { text-decoration: none !important; }
     
-    /* 스크롤바 두께 초대형 확대 (36px) 유지 */
+    /* 스크롤바 두께 대형 확대 (36px) */
     ::-webkit-scrollbar { width: 36px !important; height: 36px !important; }
     ::-webkit-scrollbar-track { background: #f1f1f1 !important; border-radius: 18px !important; box-shadow: inset 0 0 5px rgba(0,0,0,0.1) !important; }
     ::-webkit-scrollbar-thumb { background: #ffb74d !important; border-radius: 18px !important; border: 6px solid #f1f1f1 !important; }
@@ -90,60 +89,81 @@ st.markdown("""
     .hallabong-title:hover { transform: scale(1.02); }
     
     /* =========================================================
-       💡 [오류 수정] 동그란 라디오 단추 숨김 및 사각형 버튼 디자인 복구
+       💡 [완벽 복구] 라디오 버튼 숨김 및 사각형 버튼 디자인 CSS
        ========================================================= */
-    /* 1. 보기 싫은 동그란 마커(라디오 서클) 완벽 제거 */
-    div.stRadio > div[role="radiogroup"] > label > div:first-child { display: none !important; }
-    div.stRadio > div[role="radiogroup"] { display: flex; flex-direction: row; gap: 8px; flex-wrap: wrap; }
-    div.stRadio > div[role="radiogroup"] > label { 
+       
+    /* 1. 기본 라디오 마커(동그라미) 100% 강제 숨김 처리 */
+    div[data-testid="stRadio"] div[role="radiogroup"] label > div:first-child {
+        display: none !important;
+    }
+    
+    /* 버튼 컨테이너 기본 속성 */
+    div[data-testid="stRadio"] div[role="radiogroup"] { 
+        display: flex; 
+        flex-direction: row; 
+        gap: 10px !important; 
+    }
+    div[data-testid="stRadio"] div[role="radiogroup"] label { 
         margin: 0 !important; 
         cursor: pointer; 
-        transition: all 0.1s ease-in-out; 
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease-in-out; 
     }
 
-    /* 2. 로그인/비회원 메뉴 (옵션 2개짜리) - 회색톤 사각형 */
+    /* 2. 로그인/비회원 메뉴 (옵션 2개) - 회색/블루그레이 사각형 버튼 */
     div[data-testid="stRadio"]:has(label:nth-child(2)):not(:has(label:nth-child(3))) div[role="radiogroup"] { 
-        justify-content: flex-end; gap: 5px; 
+        justify-content: flex-end; 
     }
     div[data-testid="stRadio"]:has(label:nth-child(2)):not(:has(label:nth-child(3))) div[role="radiogroup"] label { 
-        background: linear-gradient(145deg, #eceff1, #cfd8dc) !important; 
+        background-color: #eceff1 !important; 
         border: 1px solid #b0bec5 !important; 
         padding: 6px 14px !important; 
         border-radius: 8px !important; 
     }
     div[data-testid="stRadio"]:has(label:nth-child(2)):not(:has(label:nth-child(3))) div[role="radiogroup"] label p { 
-        font-size: 14px !important; font-weight: 700 !important; color: #455a64 !important; margin: 0 !important; 
+        font-size: 13px !important; 
+        font-weight: 700 !important; 
+        color: #455a64 !important; 
+        margin: 0 !important; 
     }
-    div[data-testid="stRadio"]:has(label:nth-child(2)):not(:has(label:nth-child(3))) div[role="radiogroup"] label[data-checked="true"],
-    div[data-testid="stRadio"]:has(label:nth-child(2)):not(:has(label:nth-child(3))) div[role="radiogroup"] label:active { 
-        background: linear-gradient(145deg, #cfd8dc, #b0bec5) !important; 
-        transform: translateY(2px) !important; 
-        border-color: #78909c !important;
+    /* 로그인 메뉴 선택 시 스타일 */
+    div[data-testid="stRadio"]:has(label:nth-child(2)):not(:has(label:nth-child(3))) div[role="radiogroup"] label:has(div[data-checked="true"]) { 
+        background-color: #cfd8dc !important; 
+        border-color: #78909c !important; 
+        transform: translateY(2px) !important;
         box-shadow: inset 0px 2px 4px rgba(0,0,0,0.1);
     }
 
     /* 3. 8개 메인 메뉴 - 초록색 사각형 버튼 */
     div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] { 
         justify-content: center; 
-        padding-bottom: 5px; margin-bottom: 15px; 
+        flex-wrap: wrap !important; 
+        padding-bottom: 5px; 
+        margin-bottom: 15px; 
     }
     div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label { 
-        background: linear-gradient(145deg, #e8f5e9, #c8e6c9) !important; 
+        background-color: #f1f8e9 !important; 
         border: 2px solid #a5d6a7 !important; 
         padding: 8px 12px !important; 
-        border-radius: 10px !important; 
-        flex: 1 1 auto; text-align: center; white-space: nowrap; 
+        border-radius: 8px !important; 
+        flex: 1 1 auto; 
+        text-align: center; 
+        white-space: nowrap; 
     }
     div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label p { 
-        font-size: 14.5px !important; 
-        font-weight: 800 !important; color: #1b5e20 !important; margin: 0 !important; 
+        font-size: 14px !important; 
+        font-weight: 800 !important; 
+        color: #1b5e20 !important; 
+        margin: 0 !important; 
     }
-    div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label[data-checked="true"],
-    div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label:active { 
+    /* 메인 메뉴 선택 시 스타일 */
+    div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label:has(div[data-checked="true"]) { 
+        background-color: #c8e6c9 !important; 
+        border-color: #4caf50 !important; 
         transform: translateY(3px) !important; 
-        background: linear-gradient(145deg, #c8e6c9, #a5d6a7) !important; 
-        border-color: #4caf50 !important;
-        box-shadow: inset 0px 2px 4px rgba(0,0,0,0.1);
+        box-shadow: 0px 3px 6px rgba(76, 175, 80, 0.4);
     }
 
     /* 기타 기본 디자인 설정 */
@@ -547,7 +567,7 @@ with col_login:
             st.rerun()
     else:
         login_mode = st.radio("접속 방식", ["비회원", "로그인"], horizontal=True, label_visibility="collapsed", key="login_mode")
-st.markdown("<hr style='margin-top: 10px; margin-bottom: 15px;'>", unsafe_allow_html=True)
+st.markdown("<hr style='margin: 10px 0 15px 0;'>", unsafe_allow_html=True)
 
 # ==========================================
 # 🚀 본문 영역 분기 처리
