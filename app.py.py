@@ -1,14 +1,13 @@
 # ==========================================
-# 📌 버전: 34.17 | 수정일시: 2026.09.08
+# 📌 버전: 34.18 | 수정일시: 2026.09.18
 # 📌 주요 수정내용: 
 #    1. 모바일 UI/UX 최적화 (반응형 CSS, 메뉴 2줄 래핑)
 #    2. 농약 검색 결과 표 고도화 (방제이력 매칭, 방제약명 표시)
 #    3. 영농일지 카테고리(적과, 수확 추가), UI 개편, DB 에러 완벽 방어
-#    4. 로그인/회원가입 분리 및 DB_Userdata 연동
-#    5. [NEW] 최고관리자(admin) 하드코딩 로그인 지원 (ID: admin, PW: admin)
-#    6. [NEW] 게시판(정보교환마당) 본인 및 관리자 권한 분리 (관리자는 모든 글 수정/삭제 가능)
-#    7. [NEW] 관리자가 질문 글 수정 시, '답변(Reply)'을 직접 작성/수정할 수 있는 기능 추가
-#    8. [NEW] 공지 등록 메뉴를 일반 회원에게 숨기고 관리자에게만 노출하도록 보안 강화
+#    4. 로그인/회원가입 분리 및 DB_Userdata 연동 (admin 관리자 권한 지원)
+#    5. 게시판(정보교환마당) 본인 및 관리자 수정/삭제, 답변 작성 지원
+#    6. [NEW] CSS 충돌 버그 완벽 해결: 라디오 버튼(단추 형태)으로 풀려버린 현상 수정
+#    7. [NEW] 메인 메뉴 및 로그인 메뉴를 원래의 '사각형 버튼(Pill)' 형태로 완벽 복구
 # ==========================================
 
 import streamlit as st
@@ -81,6 +80,7 @@ st.markdown("""
     <style>
     a.home-link { text-decoration: none !important; }
     
+    /* 스크롤바 두께 초대형 확대 (36px) 유지 */
     ::-webkit-scrollbar { width: 36px !important; height: 36px !important; }
     ::-webkit-scrollbar-track { background: #f1f1f1 !important; border-radius: 18px !important; box-shadow: inset 0 0 5px rgba(0,0,0,0.1) !important; }
     ::-webkit-scrollbar-thumb { background: #ffb74d !important; border-radius: 18px !important; border: 6px solid #f1f1f1 !important; }
@@ -89,22 +89,64 @@ st.markdown("""
     .hallabong-title { background-color: #e65100; padding: 15px; border-radius: 20px; text-align: center; color: white; font-weight: 900; font-size: 2.8rem; box-shadow: 0px 6px 15px rgba(230, 81, 0, 0.3); border: 3px solid #ffcc80; transition: transform 0.2s ease-in-out; margin-bottom: 10px; }
     .hallabong-title:hover { transform: scale(1.02); }
     
-    div[data-testid="stRadio"] div[role="radiogroup"] div[data-baseweb="radio"] div { display: none !important; }
-    div[data-testid="stRadio"] div[role="radiogroup"] { display: flex; flex-direction: row; gap: 8px; }
-    div[data-testid="stRadio"] div[role="radiogroup"] label { margin: 0 !important; cursor: pointer; transition: all 0.1s ease-in-out; }
+    /* =========================================================
+       💡 [오류 수정] 동그란 라디오 단추 숨김 및 사각형 버튼 디자인 복구
+       ========================================================= */
+    /* 1. 보기 싫은 동그란 마커(라디오 서클) 완벽 제거 */
+    div.stRadio > div[role="radiogroup"] > label > div:first-child { display: none !important; }
+    div.stRadio > div[role="radiogroup"] { display: flex; flex-direction: row; gap: 8px; flex-wrap: wrap; }
+    div.stRadio > div[role="radiogroup"] > label { 
+        margin: 0 !important; 
+        cursor: pointer; 
+        transition: all 0.1s ease-in-out; 
+    }
 
-    div[data-testid="stRadio"]:has(label:nth-child(2)):not(:has(label:nth-child(3))) div[role="radiogroup"] { justify-content: flex-end; gap: 5px; }
-    div[data-testid="stRadio"]:has(label:nth-child(2)):not(:has(label:nth-child(3))) div[role="radiogroup"] label { background: linear-gradient(145deg, #eceff1, #cfd8dc) !important; border: 1px solid #b0bec5 !important; padding: 4px 10px !important; border-radius: 6px !important; }
-    div[data-testid="stRadio"]:has(label:nth-child(2)):not(:has(label:nth-child(3))) div[role="radiogroup"] label p { font-size: 13px !important; font-weight: 700 !important; color: #455a64 !important; margin: 0 !important; }
-    div[data-testid="stRadio"]:has(label:nth-child(2)):not(:has(label:nth-child(3))) div[role="radiogroup"] label:active, 
-    div[data-testid="stRadio"]:has(label:nth-child(2)):not(:has(label:nth-child(3))) div[role="radiogroup"] label:focus-within { background: linear-gradient(145deg, #cfd8dc, #b0bec5) !important; transform: translateY(2px) !important; }
+    /* 2. 로그인/비회원 메뉴 (옵션 2개짜리) - 회색톤 사각형 */
+    div[data-testid="stRadio"]:has(label:nth-child(2)):not(:has(label:nth-child(3))) div[role="radiogroup"] { 
+        justify-content: flex-end; gap: 5px; 
+    }
+    div[data-testid="stRadio"]:has(label:nth-child(2)):not(:has(label:nth-child(3))) div[role="radiogroup"] label { 
+        background: linear-gradient(145deg, #eceff1, #cfd8dc) !important; 
+        border: 1px solid #b0bec5 !important; 
+        padding: 6px 14px !important; 
+        border-radius: 8px !important; 
+    }
+    div[data-testid="stRadio"]:has(label:nth-child(2)):not(:has(label:nth-child(3))) div[role="radiogroup"] label p { 
+        font-size: 14px !important; font-weight: 700 !important; color: #455a64 !important; margin: 0 !important; 
+    }
+    div[data-testid="stRadio"]:has(label:nth-child(2)):not(:has(label:nth-child(3))) div[role="radiogroup"] label[data-checked="true"],
+    div[data-testid="stRadio"]:has(label:nth-child(2)):not(:has(label:nth-child(3))) div[role="radiogroup"] label:active { 
+        background: linear-gradient(145deg, #cfd8dc, #b0bec5) !important; 
+        transform: translateY(2px) !important; 
+        border-color: #78909c !important;
+        box-shadow: inset 0px 2px 4px rgba(0,0,0,0.1);
+    }
 
-    div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] { justify-content: center; flex-wrap: wrap !important; padding-bottom: 5px; margin-bottom: 15px; }
-    div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label { background: linear-gradient(145deg, #e8f5e9, #c8e6c9) !important; border: 2px solid #a5d6a7 !important; padding: 6px 8px !important; border-radius: 8px !important; flex: 1 1 auto; text-align: center; white-space: nowrap; }
-    div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label p { font-size: 13.5px !important; font-weight: 800 !important; color: #1b5e20 !important; margin: 0 !important; }
-    div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label:active, 
-    div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label:focus-within { transform: translateY(3px) !important; background: linear-gradient(145deg, #c8e6c9, #a5d6a7) !important; }
+    /* 3. 8개 메인 메뉴 - 초록색 사각형 버튼 */
+    div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] { 
+        justify-content: center; 
+        padding-bottom: 5px; margin-bottom: 15px; 
+    }
+    div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label { 
+        background: linear-gradient(145deg, #e8f5e9, #c8e6c9) !important; 
+        border: 2px solid #a5d6a7 !important; 
+        padding: 8px 12px !important; 
+        border-radius: 10px !important; 
+        flex: 1 1 auto; text-align: center; white-space: nowrap; 
+    }
+    div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label p { 
+        font-size: 14.5px !important; 
+        font-weight: 800 !important; color: #1b5e20 !important; margin: 0 !important; 
+    }
+    div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label[data-checked="true"],
+    div[data-testid="stRadio"]:has(label:nth-child(8)) div[role="radiogroup"] label:active { 
+        transform: translateY(3px) !important; 
+        background: linear-gradient(145deg, #c8e6c9, #a5d6a7) !important; 
+        border-color: #4caf50 !important;
+        box-shadow: inset 0px 2px 4px rgba(0,0,0,0.1);
+    }
 
+    /* 기타 기본 디자인 설정 */
     div[data-testid="stForm"], div[data-testid="stExpander"] { font-size: 18px !important; font-weight: 800 !important; }
     input[type="text"], input[type="password"], div[data-baseweb="select"] span, div[data-baseweb="select"] input, div[data-testid="stDateInput"] input, div[data-testid="stTimeInput"] input, textarea { font-size: 16px !important; padding: 6px 10px !important; }
     div[data-testid="stForm"] { border: 3px solid #ffb74d; border-radius: 15px; padding: 25px; box-shadow: 0px 6px 15px rgba(255,183,77,0.15); margin-bottom: 15px; }
@@ -522,7 +564,6 @@ if st.session_state.get('login_mode') == "로그인" and not st.session_state.lo
             log_pw = st.text_input("비밀번호 (PW) *", type="password", key="log_pw")
             
             if st.form_submit_button("로그인", type="primary"):
-                # 💡 [핵심] 최고관리자(admin) 하드코딩 로그인 기능
                 if log_id == "admin" and log_pw == "admin":
                     st.session_state.logged_in = True
                     st.session_state.current_user = {
@@ -1148,7 +1189,6 @@ else:
     elif menu == "정보교환마당":
         st.subheader("💬 정보교환마당")
         
-        # 💡 [권한 확인] 현재 사용자가 로그인한 최고관리자(admin)인지 확인
         is_admin = st.session_state.logged_in and st.session_state.current_user.get('id') == 'admin'
         
         df_board = pd.DataFrame()
@@ -1193,7 +1233,6 @@ else:
                             date_str = str(row.get('created_at', ''))[:10]
                             st.markdown(f"<div style='background-color: #fffde7; padding: 15px; border-radius: 8px; border: 1px solid #fdd835; margin-bottom: 8px;'><li style='margin-bottom: 5px; line-height: 1.4; list-style-type: none;'>{content} <br><span style='font-size:12px; color:gray;'>({date_str})</span></li></div>", unsafe_allow_html=True)
                             
-                            # 💡 [핵심] 작성자 본인이거나 최고관리자일 경우 수정/삭제 버튼 표시
                             is_author = st.session_state.logged_in and str(row.get('UserID')) == str(st.session_state.current_user.get('id', ''))
                             if is_author or is_admin:
                                 c1, c2, _ = st.columns([1.5, 1.5, 7])
@@ -1211,7 +1250,6 @@ else:
                 else: st.info("등록된 공지사항이 없습니다.")
             else: st.info("등록된 공지사항이 없습니다.")
             
-            # 💡 [핵심] 공지 등록 메뉴는 관리자 계정으로 접속했을 때만 나타나게 처리
             if is_admin:
                 with st.expander("➕ 공지 등록 (관리자 전용)"):
                     with st.form("notice_form", clear_on_submit=True):
@@ -1243,7 +1281,6 @@ else:
                             with st.form(key=f"edit_form_q_{post_id}"):
                                 new_content = st.text_area("질문 내용 수정", value=row.get('Content', ''))
                                 
-                                # 💡 [핵심] 관리자가 수정할 때는 답변(Reply)을 달 수 있는 텍스트 영역 활성화
                                 new_reply = row.get('Reply', '')
                                 if is_admin:
                                     st.markdown("<p style='color:#2e7d32; font-weight:bold; margin-top:10px; margin-bottom:0px;'>[답변 작성란 - 관리자 전용]</p>", unsafe_allow_html=True)
@@ -1256,7 +1293,7 @@ else:
                                 if submit_edit:
                                     try:
                                         update_data = {"Content": new_content}
-                                        if is_admin: # 관리자는 답변 내용도 업데이트 항목에 포함
+                                        if is_admin: 
                                             update_data["Reply"] = new_reply
                                             
                                         supabase.table("DBboard").update(update_data).eq("ID", post_id).execute()
@@ -1280,7 +1317,6 @@ else:
                             qa_html += "</div>"
                             st.markdown(qa_html, unsafe_allow_html=True)
                             
-                            # 💡 [핵심] 작성자 본인이거나 최고관리자일 경우 수정/삭제 버튼 표시
                             is_author = st.session_state.logged_in and str(row.get('UserID')) == str(st.session_state.current_user.get('id', ''))
                             if is_author or is_admin:
                                 c1, c2, _ = st.columns([1.5, 1.5, 7])
