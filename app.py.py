@@ -1,12 +1,11 @@
 # ==========================================
-# 📌 버전: 34.27 | 수정일시: 2026.09.19
+# 📌 버전: 34.28 | 수정일시: 2026.09.19
 # 📌 주요 수정내용: 
-#    1. [완벽수정] 모바일 브라우저 CSS 호환성 완벽 해결 (최신 문법 제거 및 구역별 강제 지정)
-#    2. [완벽수정] 8개 메인 메뉴는 무조건 사각형 버튼으로 만들고 '진한 파란색 + 굵은 글씨체' 적용
-#    3. [완벽수정] 상단 로그인/비회원 메뉴는 무조건 순정 형태(동그란 단추)로 예외 처리 강제 유지
-#    4. 모바일 접속 시 메인 메뉴 4개씩 2줄 격자로 강제 정렬 및 잘림 방지
+#    1. [원천해결] 스트림릿 내부 DOM 태그(span, p, div)의 색상 강제 상속 문제 완벽 타파
+#    2. [완벽수정] 8개 메인 메뉴 사각형 버튼 + '진한 파란색(#0D47A1)' + '아주 굵은 글씨(900)' 강제 적용
+#    3. [완벽수정] 로그인/비회원 메뉴는 무조건 동그란 순정 단추와 기본 글씨체로 예외 유지
+#    4. 모바일 화면(스마트폰) 8개 메뉴 4개씩 2줄(Grid) 정렬 유지
 #    5. 영농일지 표 제목(헤더) 가운데 정렬 및 텍스트 자동 줄바꿈 완벽 유지
-#    6. 최고관리자(admin) 권한 및 기능 유지
 # ==========================================
 
 import streamlit as st
@@ -89,22 +88,22 @@ st.markdown("""
     .hallabong-title:hover { transform: scale(1.02); }
     
     /* =========================================================
-       💡 [완벽 복구] 모든 기기 호환 강제 CSS (위치 기반 분리)
+       💡 [최종 병기] 스트림릿 내부 태그 색상 강제 오버라이딩
        ========================================================= */
        
-    /* 1. 기본적으로 화면의 모든 라디오 버튼을 8개 메뉴를 위한 사각형 버튼으로 강제 변환 */
+    /* 1. 화면 전체 라디오 버튼(메인 메뉴 8개 기준) 레이아웃 및 사각형 껍데기 설정 */
     div.stRadio > div[role="radiogroup"] { 
         display: flex !important; flex-direction: row !important; flex-wrap: wrap !important; 
         justify-content: center !important; gap: 8px !important; margin-bottom: 15px !important; 
     }
     
-    /* 동그라미 단추 원천 삭제 */
+    /* 동그라미 단추 무조건 삭제 */
     div.stRadio > div[role="radiogroup"] > label > div:first-child,
     div.stRadio > div[role="radiogroup"] > label input { 
         display: none !important; 
     }
     
-    /* 사각형 디자인 적용 (메인 메뉴) */
+    /* 사각형 테두리 및 배경 */
     div.stRadio > div[role="radiogroup"] > label { 
         background: linear-gradient(145deg, #e8f5e9, #c8e6c9) !important; 
         border: 2px solid #a5d6a7 !important; 
@@ -115,11 +114,14 @@ st.markdown("""
         transition: all 0.2s ease-in-out !important;
     }
     
-    /* 💡 [핵심] 진한 파란색 + 굵은 글씨체 (사용자 요청 사항) */
-    div.stRadio > div[role="radiogroup"] > label p { 
-        font-size: 15px !important; 
+    /* 💡 [핵심] 버튼 내부의 모든 글자 태그(label, p, span, div)를 추적하여 진한 파란색 굵은 글씨로 강제 고정 */
+    div.stRadio > div[role="radiogroup"] > label,
+    div.stRadio > div[role="radiogroup"] > label p,
+    div.stRadio > div[role="radiogroup"] > label span,
+    div.stRadio > div[role="radiogroup"] > label div { 
+        font-size: 15.5px !important; 
         font-weight: 900 !important; /* 아주 굵은 글씨체 */
-        color: #0D47A1 !important; /* 진한 파란색 */
+        color: #0D47A1 !important;   /* 진한 파란색 */
         margin: 0 !important; 
     }
     
@@ -132,26 +134,28 @@ st.markdown("""
         box-shadow: inset 0px 3px 6px rgba(0,0,0,0.15) !important;
     }
 
-    /* 2. 로그인/비회원 메뉴 (상단 우측 컬럼 내부)를 '동그란 단추 형태'로 강제 예외 처리 및 복구 */
+    /* 2. 로그인/비회원 메뉴 (상단 우측 컬럼 구역) 강제 예외 처리 -> 순정 단추 유지 */
     div[data-testid="column"] div.stRadio > div[role="radiogroup"] {
         justify-content: flex-end !important; margin-bottom: 0 !important; gap: 15px !important; display: flex !important; flex-wrap: nowrap !important;
     }
+    /* 사각형 테두리 및 배경 없애기 */
     div[data-testid="column"] div.stRadio > div[role="radiogroup"] > label {
         background: transparent !important; border: none !important; padding: 0 !important; border-radius: 0 !important; 
         box-shadow: none !important; transform: none !important; flex: 0 1 auto !important;
     }
-    
-    /* 동그라미 다시 보이기 */
+    /* 동그라미 단추 다시 살려내기 */
     div[data-testid="column"] div.stRadio > div[role="radiogroup"] > label > div:first-child {
         display: flex !important; 
     }
-    
-    /* 로그인 메뉴 글씨는 기본 색상 및 두께로 복구 */
-    div[data-testid="column"] div.stRadio > div[role="radiogroup"] > label p {
+    /* 💡 [핵심] 로그인 메뉴 글자색을 파란색이 아닌 까만색/회색으로 원상복구 */
+    div[data-testid="column"] div.stRadio > div[role="radiogroup"] > label,
+    div[data-testid="column"] div.stRadio > div[role="radiogroup"] > label p,
+    div[data-testid="column"] div.stRadio > div[role="radiogroup"] > label span,
+    div[data-testid="column"] div.stRadio > div[role="radiogroup"] > label div {
         font-size: 14px !important; font-weight: 600 !important; color: #333 !important;
     }
 
-    /* 기타 폼/카드 디자인 설정 */
+    /* 기타 기본 디자인 설정 */
     div[data-testid="stForm"], div[data-testid="stExpander"] { font-size: 18px !important; font-weight: 800 !important; }
     input[type="text"], input[type="password"], div[data-baseweb="select"] span, div[data-baseweb="select"] input, div[data-testid="stDateInput"] input, div[data-testid="stTimeInput"] input, textarea { font-size: 16px !important; padding: 6px 10px !important; }
     div[data-testid="stForm"] { border: 3px solid #ffb74d; border-radius: 15px; padding: 25px; box-shadow: 0px 6px 15px rgba(255,183,77,0.15); margin-bottom: 15px; }
@@ -161,8 +165,25 @@ st.markdown("""
     .card-weather { border: 3px solid #ffcc80; text-align: center; font-size: 1.15rem; font-weight: 800; line-height: 1.4; background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%); color: #3e2723; }
     .card-notice { border: 2px solid #fdd835; height: 100%; min-height: 400px; background-color: #fffde7; color: #333; }
     .card-qa { border: 2px solid #64b5f6; height: 100%; min-height: 400px; background-color: #e3f2fd; color: #333; }
+    .card-moa { border: 3px solid #66bb6a; margin-top: 20px; position: relative; overflow: hidden; background-color: #f8fbfa; }
+    .moa-inner { padding: 15px 20px; border-radius: 12px; margin-bottom: 15px; box-shadow: 0px 2px 5px rgba(0,0,0,0.03); }
+    .moa-inner.type { background-color: white; border-left: 5px solid #1565c0; color: #333;}
+    .moa-inner.desc { background-color: white; border-left: 5px solid #e65100; color: #333;}
+    .moa-inner.detail { background-color: #e8f5e9; border-left: 5px solid #2e7d32; color: #333;}
     .moa-result-card { background-color: #f1f8e9; border-left: 5px solid #66bb6a; border-radius: 8px; padding: 15px; margin-bottom: 10px; color: #333; }
+    .moa-result-card h4 { color: #2e7d32; margin: 0 0 5px 0; }
+    .moa-result-card p.title { margin: 0 0 8px 0; font-size: 14px; font-weight: bold; color: #333; }
+    .moa-result-card p.desc { margin: 0; color: #e65100; font-weight: bold; }
+    .ai-result-card { text-align: left; padding: 20px; border: 2px solid #ffcc80; border-radius: 12px; background-color: #fff8e1; margin-bottom: 15px; color: #333; }
+    .ai-result-card h3 { color: #e65100; margin: 0 0 10px 0; font-size: 24px; border-bottom: 2px solid #ffcc80; padding-bottom: 5px;}
+    .ai-result-card h4 { color: #2e7d32; font-weight: bold; margin-top: 15px; margin-bottom: 5px; font-size: 18px;}
+    .ai-result-card p { font-size: 16px; line-height: 1.6; margin-bottom: 10px; color: #424242; }
     .search-header-pest { background: linear-gradient(to right, #f1f8e9, transparent); padding: 15px 20px; border-left: 5px solid #4caf50; border-radius: 8px; margin-bottom: 15px; }
+    .search-header-pest h3 { margin:0; color:#2e7d32; }
+    .search-header-bug { background: linear-gradient(to right, #fff8e1, transparent); padding: 15px 20px; border-left: 5px solid #ffb300; border-radius: 8px; margin-bottom: 15px; }
+    .search-header-bug h3 { margin:0; color:#f57f17; }
+    .search-header-result { background: linear-gradient(to right, #e3f2fd, transparent); padding: 15px 20px; border-left: 5px solid #2196f3; border-radius: 8px; margin-bottom: 15px; }
+    .search-header-result h3 { margin:0; color:#1565c0; }
 
     /* =========================================================
        💡 모바일 화면(휴대폰) 완벽 반응형 
@@ -183,13 +204,15 @@ st.markdown("""
             padding: 8px 2px !important; 
             border-radius: 8px !important;
             white-space: normal !important; 
-            min-height: 45px !important; /* 버튼 높이 고정 */
+            min-height: 45px !important; 
         }
-        div.stRadio > div[role="radiogroup"] > label p { 
+        div.stRadio > div[role="radiogroup"] > label p,
+        div.stRadio > div[role="radiogroup"] > label span,
+        div.stRadio > div[role="radiogroup"] > label div { 
             font-size: 11px !important; 
             line-height: 1.25 !important;
             word-break: keep-all !important;
-            white-space: normal !important; /* 줄바꿈 허용 */
+            white-space: normal !important; 
         }
         
         /* 로그인 버튼 영역은 격자 무시하고 가로 정렬 유지 */
@@ -561,7 +584,6 @@ with col_login:
             st.session_state.login_mode = "비회원"
             st.rerun()
     else:
-        # 로그인 메뉴는 기본 라디오 버튼으로 동작하도록 마진만 적용
         login_mode = st.radio("접속 방식", ["비회원", "로그인"], horizontal=True, label_visibility="collapsed", key="login_mode")
 st.markdown("<hr style='margin: 5px 0 15px 0;'>", unsafe_allow_html=True)
 
@@ -1096,11 +1118,9 @@ else:
                 
             df_display = pd.DataFrame(display_ilji_list)
             
-            # 줄바꿈 기호를 HTML의 <br> 태그로 변환하여 텍스트 래핑 처리
             df_display['작업내용'] = df_display['작업내용'].astype(str).str.replace(r'\n', '<br>', regex=True)
             df_display['참고사항'] = df_display['참고사항'].astype(str).str.replace(r'\n', '<br>', regex=True)
             
-            # 💡 [핵심 완벽수정] th 태그에 text-align: center 강제 적용 및 클래스 세분화
             table_css = """
             <style>
             .custom-ilji-table { width: 100%; border-collapse: collapse; font-size: 14.5px; font-family: inherit; margin: 0; }
@@ -1114,15 +1134,14 @@ else:
                 top: 0 !important; 
                 z-index: 1 !important; 
                 white-space: nowrap !important; 
-                text-align: center !important; /* 헤더 무조건 가운데 정렬 */
+                text-align: center !important; 
             }
             .custom-ilji-table tbody td { 
                 padding: 12px 10px; 
                 border: 1px solid #e0e0e0; 
                 vertical-align: middle; 
-                text-align: center !important; /* 기본 가운데 정렬 */
+                text-align: center !important; 
             }
-            /* 작업내용, 참고사항(3번째, 4번째 열)은 왼쪽 정렬 유지 및 자동 줄바꿈 100% 적용 */
             .custom-ilji-table tbody td:nth-child(3), .custom-ilji-table tbody td:nth-child(4) { 
                 text-align: left !important; 
                 white-space: normal !important; 
@@ -1135,7 +1154,7 @@ else:
             </style>
             """
             
-            table_html = df_display.to_html(index=False, escape=False, classes="custom-ilji-table")
+            table_html = df_display.to_html(index=False, escape=False, classes="custom-ilji-table", justify='center')
             table_html = table_html.replace('\n', '') 
             
             final_html = f"""
